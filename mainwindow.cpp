@@ -9,7 +9,7 @@ const QStringList sADCranges = {
 };
 
 MainWindow::MainWindow(QString _peer_IP, quint16 _peer_port, QWidget *parent)
-    : QMainWindow(parent), ui(new Ui::MainWindow)
+    : QMainWindow(parent), ui(new Ui::MainWindow), meanFrame(nullptr), stdevFrame(nullptr)
 {
     ui->setupUi(this);
 
@@ -43,12 +43,14 @@ MainWindow::MainWindow(QString _peer_IP, quint16 _peer_port, QWidget *parent)
     connect(ui->horizontalSlider    , &QSlider::valueChanged, this, &MainWindow::selectedFrameChanged);
 
     //обработка поведения lineEditов
-    ui->lineEdit->setValidator       (new QRegExpValidator(QRegExp("^([1-9][0-9]{0,2}|1000)$")));
-    ui->lineEdit_com_3->setText("5555555555");
-    ui->lineEdit_com_3->setValidator (new QRegExpValidator(QRegExp("^[0-7]{1,10}$"           )));
-    ui->lineEdit_com_4->setValidator (new QRegExpValidator(QRegExp("[0-9]+"                  )));
-    ui->lineEdit_com_10->setValidator(new QRegExpValidator(QRegExp("[0-9]+"                  )));
+    ui->lineEdit->setValidator (new QRegExpValidator(QRegExp("^([1-9][0-9]{0,2}|1000)$")));
+    ADCRangeLE   = this->findChild<QLineEdit*>(QString::asprintf("lineEdit_com_%u", Command::bitNo_ADCrange  )),
+    setRateLE    = this->findChild<QLineEdit*>(QString::asprintf("lineEdit_com_%u", Command::bitNo_Scanrate  )),
+    readStreamLE = this->findChild<QLineEdit*>(QString::asprintf("lineEdit_com_%u", Command::bitNo_ReadStream));
 
+    if(ADCRangeLE  ){ADCRangeLE->setText("5555555555"); ADCRangeLE->setValidator (new QRegExpValidator(QRegExp("^[0-7]{1,10}$")));}
+    if(setRateLE   ) setRateLE->   setValidator(new QRegExpValidator(QRegExp("[0-9]+")));
+    if(readStreamLE) readStreamLE->setValidator(new QRegExpValidator(QRegExp("[0-9]+")));
 
     QList<QLineEdit*> lineEditsList = this->findChildren<QLineEdit*>(QRegularExpression("lineEdit_com_*"));
     for(auto &el : lineEditsList){
@@ -65,31 +67,36 @@ MainWindow::MainWindow(QString _peer_IP, quint16 _peer_port, QWidget *parent)
     //обработка поведения кнопок
     QList<QPushButton*> pushButtonsList = this->findChildren<QPushButton*>(QRegularExpression("pushButton_com_*"));
     for(auto &el : pushButtonsList){
+        auto elCommand = getCorrespondingCommand(el);
+        el->setText(COMMANDS[getCorrespondingBitNo(el)]);
         connect(el, &QPushButton::clicked, this, [=](){
 
             quint32* scanRate = nullptr;
             quint32* readNum = nullptr;
             Ranges* rngs = nullptr;
 
-            QPushButton* pb = qobject_cast<QPushButton*>(el);
-            if(pb == ui->pushButton_com_3 && !ui->lineEdit_com_3->text().isEmpty()){
-                    rngs = new Ranges();
-                    for(auto i = 0; i < ui->lineEdit_com_3->text().size(); ++i)
-                        rngs->values[i] = static_cast<ADCrange>(ui->lineEdit_com_3->text().mid(i, 1).toUInt());
+
+            QLineEdit* le = this->findChild<QLineEdit*>("lineEdit_com_" + el->objectName().mid(el->objectName().lastIndexOf("_")+1));
+
+            if(le && !le->text().isEmpty()){
+                if(elCommand == Command::ADCrange){
+                        rngs = new Ranges();
+                        for(auto i = 0; i < le->text().size(); ++i)
+                            rngs->values[i] = static_cast<ADCrange>(le->text().mid(i, 1).toUInt());
+                    }
+
+                if(elCommand == Command::Scanrate){
+                    scanRate = new quint32;
+                    *scanRate = le->text().toUInt();
                 }
 
-            if(pb == ui->pushButton_com_4 && !ui->lineEdit_com_4->text().isEmpty()){
-                scanRate = new quint32;
-                *scanRate = ui->lineEdit_com_4->text().toUInt();
+                if(elCommand == Command::ReadStream){
+                    readNum = new quint32;
+                    *readNum = le->text().toUInt();
+                }
             }
 
-            if(pb == ui->pushButton_com_10 && !ui->lineEdit_com_10->text().isEmpty()){
-                readNum = new quint32;
-                *readNum = ui->lineEdit_com_10->text().toUInt();
-            }
-
-            quint8 bitNo = pb->objectName().mid(pb->objectName().lastIndexOf("_") + 1).toUInt();
-            Tcpclient->sendRunCommand((1 << bitNo), rngs, scanRate, readNum);
+            Tcpclient->sendRunCommand(getCorrespondingCommand(el), rngs, scanRate, readNum);
 
             if(scanRate) delete scanRate;
             if(readNum) delete readNum;
@@ -103,7 +110,16 @@ MainWindow::MainWindow(QString _peer_IP, quint16 _peer_port, QWidget *parent)
     QList<QCheckBox*> checkBoxes = this->findChildren<QCheckBox*>(QRegularExpression("checkBox_*"));
     for(auto &el : checkBoxes) connect(el, &QCheckBox::clicked, this, [=](){ui->pushButton_run->setEnabled(getUIcommandMask());});
 
-    initMap();
+    initMap(ui->plotMap,      colorMap,     colorScale    );
+    initMap(ui->plotMapMean,  colorMapMean, colorScaleMean, "Mean map" );
+    initMap(ui->plotMapSigma, colorMapStd,  colorScaleStd , "Stdev map");
+
+    connect(ui->plotMap     , &QCustomPlot::plottableClick, this, &MainWindow::saveImage);
+    connect(ui->plotMapMean , &QCustomPlot::plottableClick, this, &MainWindow::saveImage);
+    connect(ui->plotMapSigma, &QCustomPlot::plottableClick, this, &MainWindow::saveImage);
+
+    meanBars = new QCPBars(ui->histMean->xAxis, ui->histMean->yAxis);
+    stdBars  = new QCPBars(ui->histSigma->xAxis, ui->histSigma->yAxis);
 }
 
 MainWindow::~MainWindow(){
@@ -126,49 +142,56 @@ void MainWindow::runGUIControl(bool enabled){
     }
 }
 
-void MainWindow::updateMap(Frame &fr){
-    colorMap->data()->setSize(fr.sizeZ, fr.sizeX);
-    colorMap->data()->setRange(QCPRange(0, fr.sizeZ), QCPRange(0, fr.sizeX));
-
-        for(auto i = 0; i < fr.sizeZ; ++i)
-            for(auto k = 0; k < fr.sizeX; ++k){
-                colorMap->data()->setCell(i, k, fr(i, k));
-            }
-
-    colorScale->setDataRange(QCPRange(0, 1 << static_cast<int>(std::ceil(std::log2(fr.max())))));
-
-    ui->plotMap->rescaleAxes();
-    ui->plotMap->replot();
-
-    ui->statusbar->showMessage("Map updated", 10);
+quint16 MainWindow::getCorrespondingCommand(QWidget *wgt){
+    return (1 <<  wgt->objectName().split("_", Qt::SkipEmptyParts).last().toUInt());
 }
 
-void MainWindow::initMap(){
+quint8 MainWindow::getCorrespondingBitNo(QWidget *wgt){
+    return wgt->objectName().split("_", Qt::SkipEmptyParts).last().toUInt();
+}
+
+
+void MainWindow::updateMap(Frame &fr, QCustomPlot *&plot, QCPColorMap *&cmap, float* sampMin, float* sampMax){
+    cmap->data()->setSize(fr.sizeZ, fr.sizeX);
+    cmap->data()->setRange(QCPRange(0.5, 31.5), QCPRange(0.5, 79.5));
+
+        for(auto i = 0; i < fr.sizeZ; ++i)
+            for(auto k = 0; k < fr.sizeX; ++k)
+                cmap->data()->setCell(i, k, fr(i, k));
+
+    cmap->setDataRange(QCPRange(sampMin ? *sampMin : fr.min(), sampMax ? *sampMax : fr.max()));
+    plot->xAxis->setRange(QCPRange(0, fr.sizeZ));
+    plot->yAxis->setRange(QCPRange(0, fr.sizeX));
+    plot->replot();
+}
+
+
+void MainWindow::initMap(QCustomPlot *&plot, QCPColorMap *&cmap, QCPColorScale *&cscale, QString title){
     // configure axis rect:
-    //ui->plotMap->setInteractions(QCP::iRangeDrag|QCP::iRangeZoom); // this will also allow rescaling the color scale by dragging/zooming
-    ui->plotMap->axisRect()->setupFullAxesBox(true);
-    ui->plotMap->xAxis->setLabel("Z");
-    ui->plotMap->yAxis->setLabel("X");
+    // plot->setInteractions(QCP::iRangeDrag|QCP::iRangeZoom); // this will also allow rescaling the color scale by dragging/zooming
+    plot->plotLayout()->insertRow(0);
+    plot->plotLayout()->addElement(0, 0, new QCPTextElement(plot, title));
+    plot->axisRect()->setupFullAxesBox(true);
+    plot->xAxis->setLabel("Z");
+    plot->yAxis->setLabel("X");
 
-    colorMap = new QCPColorMap(ui->plotMap->xAxis, ui->plotMap->yAxis);
-    colorMap->setInterpolate(false);
+    cmap = new QCPColorMap(plot->xAxis, plot->yAxis);
+    cmap->setInterpolate(false);
 
-    colorScale = new QCPColorScale(ui->plotMap);
-    ui->plotMap->plotLayout()->addElement(0, 1, colorScale); // add it to the right of the main axis rect
-    colorScale->setType(QCPAxis::atRight); // scale shall be vertical bar with tick/axis labels right (actually atRight is already the default)
-    colorMap->setColorScale(colorScale); // associate the color map with the color scale
-    colorScale->axis()->setLabel("Amplitude");
-//    colorScale->setDataScaleType(QCPAxis::stLogarithmic);
+    cscale = new QCPColorScale(plot);
+    plot->plotLayout()->addElement(1, 1, cscale); // add it to the right of the main axis rect
+    cscale->setType(QCPAxis::atRight); // scale shall be vertical bar with tick/axis labels right (actually atRight is already the default)
+    cmap->setColorScale(cscale); // associate the color map with the color scale
+    cscale->axis()->setLabel("ADC units");
 
-    colorMap->setGradient(QCPColorGradient::gpIon);
+    cmap->setGradient(getGradient(kDarkBodyRadiator));
 
     // make sure the axis rect and color scale synchronize their bottom and top margins (so they line up):
-    QCPMarginGroup *marginGroup = new QCPMarginGroup(ui->plotMap);
-    ui->plotMap->axisRect()->setMarginGroup(QCP::msBottom|QCP::msTop, marginGroup);
-    colorScale->setMarginGroup(QCP::msBottom|QCP::msTop, marginGroup);
-    colorScale->setRangeDrag(false);
-    colorScale->setRangeZoom(false);
-
+    QCPMarginGroup *marginGroup = new QCPMarginGroup(plot);
+    plot->axisRect()->setMarginGroup(QCP::msBottom|QCP::msTop, marginGroup);
+    cscale->setMarginGroup(QCP::msBottom|QCP::msTop, marginGroup);
+    cscale->setRangeDrag(false);
+    cscale->setRangeZoom(false);
 
 }
 
@@ -185,17 +208,43 @@ void MainWindow::getScanState(ScanState *resp){
 }
 
 void MainWindow::getScanData(ScanData *resp){
-    ScanData *sd = resp;
     ui->pushButton_getData->setEnabled(true);
+
+    if(meanFrame)  delete meanFrame;
+    if(stdevFrame) delete stdevFrame;
+
+    ScanData *sd = resp;
     getFrames(sd, frames);
-    updateMap(frames.first());
-    writeToFile(frames);
+    writeToFile(sd);
+
+    if(!frames.empty()){
+        sampleMax = frames.first().max();
+        sampleMin = frames.first().min();
+    }
+
+    for(auto &fr : frames){
+        if(sampleMin > fr.min()) sampleMin = fr.min();
+        if(sampleMax < fr.max()) sampleMax = fr.max();
+    }
+
+    meanFrame  = new Frame(frames.begin(), frames.end(), FrameMEAN            );
+    stdevFrame = new Frame(frames.begin(), frames.end(), FrameSTDEV, meanFrame);
+
+    updateMap(frames.first(), ui->plotMap,   colorMap    , &sampleMin, &sampleMax);
+    updateMap(*meanFrame, ui->plotMapMean,   colorMapMean);
+    updateMap(*stdevFrame, ui->plotMapSigma, colorMapStd );
+
+    // writeToFile(frames); ASCII writing to file
     currentframeIndex = 0;
     ui->pushButton_prevFrame->setEnabled(false);
     if(frames.size() > 1 ) ui->pushButton_nextFrame->setEnabled(true);
     ui->horizontalSlider->setEnabled(true);
     ui->horizontalSlider->setRange(0, frames.size() - 1);
-    ui->label_frameNo->setText(QString::asprintf("Frame %d/%d", currentframeIndex + 1, frames.size()));
+    QString txt = QString::asprintf("Frame %d/%d", currentframeIndex + 1, frames.size());
+    ui->label_frameNo->setText(txt);
+
+    // QCPTextElement *title = dynamic_cast<QCPTextElement*>(ui->plotMap->plotLayout()->element(0, 0));
+    // title->setText(txt);
 }
 
 void MainWindow::getRunResponse(Run *resp){
@@ -211,13 +260,15 @@ void MainWindow::getRunResponse(Run *resp){
     if(Command::Reset       & mask) ui->textEdit_messages->append("Reset " + QString(rc.resetSuccessful ? "successful" : "failed"));
     if(Command::Drift       & mask) ui->textEdit_messages->append("Drift correction: " + QString(rc.driftCorrection == 0 ? "¯\\_(ツ)_/¯" : (rc.driftCorrection == 1 ? "done" : "failed")));
     if(Command::Offset      & mask) ui->textEdit_messages->append("Offset correction: " + (rc.offsetCorrection == 0 ? QString("¯\\_(ツ)_/¯") : (rc.offsetCorrection == 1 ? QString("done") : QString("failed"))));
-    if(Command::StartStream & mask) ui->textEdit_messages->append("Start data reading: response received");
     if(Command::RemainWords & mask) ui->textEdit_messages->append(QString::asprintf("Data FIFO payload: %u 32-bit words", rc.FIFOpayload));
     if(Command::EndMessage  & mask) ui->textEdit_messages->append(QString::asprintf("MSG payload: %u", rc.MSGpayload));
-    if(Command::ReadStream  & mask) {ui->textEdit_messages->append(QString::asprintf("Trying to read %u frames", rc.tryReadNFrames));
+    if(Command::ReadStream  & mask){ui->textEdit_messages->append(QString::asprintf("Trying to read %u frames", rc.tryReadNFrames));
         if(rc.readerrCode) ui->textEdit_messages->append( rc.readerrCode == 1 ? "ERROR read: FIFO is empty" : "Unknown Error");
         else ui->textEdit_messages->append(QString::asprintf("%u frames collected", rc.framesCollected));
     }
+    if(Command::kadr_on     & mask) ui->textEdit_messages->append("Set KADR on" );
+    if(Command::kadr_off    & mask) ui->textEdit_messages->append("Set KADR off");
+    if(Command::mux_adc     & mask) ui->textEdit_messages->append("Set MUX"     );
     runGUIControl(true);
 }
 
@@ -235,6 +286,16 @@ void MainWindow::writeToFile(QVector<Frame> &frames){
     stream.close();
 }
 
+void MainWindow::writeToFile(ScanData *sd, QString fileName){
+    std::ofstream outHeader((fileName + ".hdr").toStdString(), std::ios::out);
+    outHeader << QString::asprintf("Matrix-Size-X: %u\nMatrix-Size-Z: %u\nBytes-Per-Pixel: %u", sd->getSizeX(), sd->getSizeZ(), sd->getBytesPerPixel()).toStdString();
+    outHeader.close();
+
+    std::ofstream outData((fileName + ".dat").toStdString(), std::ios::out | std::ios::binary);
+    outData.write(sd->getData(), sd->getContentLength());
+    outData.close();
+}
+
 void MainWindow::sendRunCommand(){
     quint16 msk = getUIcommandMask();
 
@@ -242,20 +303,20 @@ void MainWindow::sendRunCommand(){
     quint32* readNum = nullptr;
     Ranges* rngs = nullptr;
 
-    if(msk & Command::ADCrange && !ui->lineEdit_com_3->text().isEmpty()){
+    if(msk & Command::ADCrange && !ADCRangeLE->text().isEmpty()){
         rngs = new Ranges();
-        for(auto i = 0; i < ui->lineEdit_com_3->text().size(); ++i)
-            rngs->values[i] = static_cast<ADCrange>(ui->lineEdit_com_3->text().mid(i, 1).toUInt());
+        for(auto i = 0; i < ADCRangeLE->text().size(); ++i)
+            rngs->values[i] = static_cast<ADCrange>(ADCRangeLE->text().mid(i, 1).toUInt());
     }
 
-    if(msk & Command::Scanrate && !ui->lineEdit_com_4->text().isEmpty()){
+    if(msk & Command::Scanrate && !setRateLE->text().isEmpty()){
         scanRate = new quint32;
-        *scanRate = ui->lineEdit_com_4->text().toUInt();
+        *scanRate = setRateLE->text().toUInt();
     }
 
-    if(msk & Command::ReadStream && !ui->lineEdit_com_10->text().isEmpty()){
-        readNum = new quint32;
-        *readNum = ui->lineEdit_com_10->text().toUInt();
+    if(msk & Command::ReadStream && !readStreamLE->text().isEmpty()){
+        readNum  = new quint32;
+        *readNum = readStreamLE->text().toUInt();
     }
 
     if(msk) Tcpclient->sendRunCommand(msk, rngs, scanRate, readNum);
@@ -267,21 +328,53 @@ void MainWindow::sendRunCommand(){
     runGUIControl(false);
 }
 
+void MainWindow::saveImage(QCPAbstractPlottable *  plottable, int  dataIndex, QMouseEvent* evnt){
+    Q_UNUSED(plottable)
+    Q_UNUSED(dataIndex)
+
+    if(evnt->button() != Qt::RightButton) return;
+    QMenu* menu = new QMenu(this);
+    QAction *pdfSave = menu->addAction("Save");
+    QAction *saveAs = menu->addAction("Save as...");
+    QCustomPlot* plotObj = qobject_cast<QCustomPlot*>(sender());
+    QCPTextElement *te = dynamic_cast<QCPTextElement*>(plotObj->plotLayout()->element(0,0));
+
+    connect(pdfSave, &QAction::triggered, this, [=](bool trig){plotObj->savePdf(te->text() + ".pdf");}, Qt::ConnectionType::UniqueConnection);
+    connect(saveAs, &QAction::triggered, this, [=](bool trig){
+        QString fileName = QFileDialog::getSaveFileName(this, tr("Save image"), te->text(), tr("*.jpg;;*.bmp;;*.png;;*.pdf"));
+        if(fileName.isEmpty()) return;
+        QString format = fileName.split(".").last();
+        qDebug() << fileName;
+        if(format == "jpg") plotObj->saveJpg(fileName);
+        if(format == "bmp") plotObj->saveBmp(fileName);
+        if(format == "png") plotObj->savePng(fileName);
+        if(format == "pdf") plotObj->savePdf(fileName);
+    });
+
+    menu->popup(evnt->globalPos());
+
+}
+
 void MainWindow::selectedFrameChanged(){
     QPushButton *but = qobject_cast<QPushButton*>(sender());
     if(but == ui->pushButton_prevFrame && currentframeIndex > 0)
-        updateMap(frames[--currentframeIndex]);
+        updateMap(frames[--currentframeIndex], ui->plotMap, colorMap, &sampleMin, &sampleMax);
     else if(but == ui->pushButton_nextFrame && frames.size() - 1 > currentframeIndex)
-        updateMap(frames[++currentframeIndex]);
+        updateMap(frames[++currentframeIndex], ui->plotMap, colorMap, &sampleMin, &sampleMax);
     else if(qobject_cast<QSlider*>(sender()) == ui->horizontalSlider){
         if(ui->horizontalSlider->value() == currentframeIndex) return;
-        updateMap(frames[currentframeIndex = ui->horizontalSlider->value()]);
+        updateMap(frames[currentframeIndex = ui->horizontalSlider->value()], ui->plotMap, colorMap, &sampleMin, &sampleMax);
     }
     ui->horizontalSlider->setValue(currentframeIndex);
 
     ui->pushButton_prevFrame->setEnabled(currentframeIndex);
     ui->pushButton_nextFrame->setEnabled(currentframeIndex != frames.size() - 1);
-    ui->label_frameNo->setText(QString::asprintf("Frame %d/%d", currentframeIndex + 1, frames.size()));
+    QString txt = QString::asprintf("Frame %d/%d", currentframeIndex + 1, frames.size());
+    ui->label_frameNo->setText(txt);
+    // qDebug() << txt;
+
+    // ui->plotMap->plotLayout()->remove(ui->plotMap->plotLayout()->element(0,0));
+    // ui->plotMap->plotLayout()->addElement(0,0,new QCPTextElement(ui->plotMap, txt));
 }
 
 quint16 MainWindow::getUIcommandMask(){
@@ -293,4 +386,12 @@ quint16 MainWindow::getUIcommandMask(){
         if(el->isChecked()) mask |= (1 << bit);
     }
     return mask;
+}
+
+QCPColorGradient getGradient(const QList<QColor> &palette){
+    QCPColorGradient retValue;
+    QMap<double, QColor> map;
+    for(auto i = 0; i < palette.size(); ++i) map.insert(static_cast<double>(i) / palette.size(), palette.at(i));
+    retValue.setColorStops(map);
+    return retValue;
 }

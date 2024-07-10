@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1069</width>
-    <height>883</height>
+    <width>1856</width>
+    <height>903</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -18,15 +18,30 @@
     <item row="2" column="2">
      <layout class="QFormLayout" name="formLayout_2">
       <property name="sizeConstraint">
-       <enum>QLayout::SetMinimumSize</enum>
+       <enum>QLayout::SetFixedSize</enum>
+      </property>
+      <property name="fieldGrowthPolicy">
+       <enum>QFormLayout::FieldsStayAtSizeHint</enum>
       </property>
       <item row="0" column="1">
        <widget class="QPushButton" name="pushButton_getData">
         <property name="sizePolicy">
-         <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
           <horstretch>0</horstretch>
           <verstretch>0</verstretch>
          </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>300</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>300</width>
+          <height>16777215</height>
+         </size>
         </property>
         <property name="text">
          <string>Get data</string>
@@ -39,10 +54,22 @@
          <bool>false</bool>
         </property>
         <property name="sizePolicy">
-         <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
           <horstretch>0</horstretch>
           <verstretch>0</verstretch>
          </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>300</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>300</width>
+          <height>16777215</height>
+         </size>
         </property>
         <property name="text">
          <string>Get Metainfo</string>
@@ -55,10 +82,22 @@
          <bool>false</bool>
         </property>
         <property name="sizePolicy">
-         <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
           <horstretch>0</horstretch>
           <verstretch>0</verstretch>
          </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>300</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>300</width>
+          <height>16777215</height>
+         </size>
         </property>
         <property name="text">
          <string>Get scan state</string>
@@ -68,10 +107,22 @@
       <item row="6" column="1">
        <widget class="QPushButton" name="pushButton_gls">
         <property name="sizePolicy">
-         <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
           <horstretch>0</horstretch>
           <verstretch>0</verstretch>
          </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>300</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>300</width>
+          <height>16777215</height>
+         </size>
         </property>
         <property name="text">
          <string>Get last scan</string>
@@ -81,20 +132,20 @@
       <item row="7" column="1">
        <widget class="QTextEdit" name="textEdit_messages">
         <property name="sizePolicy">
-         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
           <horstretch>0</horstretch>
           <verstretch>0</verstretch>
          </sizepolicy>
         </property>
         <property name="minimumSize">
          <size>
-          <width>280</width>
+          <width>300</width>
           <height>150</height>
          </size>
         </property>
         <property name="maximumSize">
          <size>
-          <width>280</width>
+          <width>300</width>
           <height>150</height>
          </size>
         </property>
@@ -106,7 +157,7 @@
       <item row="9" column="0" colspan="2">
        <widget class="QGroupBox" name="groupBox_2">
         <property name="sizePolicy">
-         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
           <horstretch>0</horstretch>
           <verstretch>0</verstretch>
          </sizepolicy>
@@ -116,70 +167,17 @@
         </property>
         <layout class="QHBoxLayout" name="horizontalLayout_2">
          <item>
-          <widget class="QPushButton" name="pushButton_prevFrame">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="minimumSize">
-            <size>
-             <width>0</width>
-             <height>24</height>
-            </size>
-           </property>
-           <property name="maximumSize">
-            <size>
-             <width>24</width>
-             <height>24</height>
-            </size>
-           </property>
-           <property name="text">
-            <string>&lt;</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="pushButton_nextFrame">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="minimumSize">
-            <size>
-             <width>0</width>
-             <height>24</height>
-            </size>
-           </property>
-           <property name="maximumSize">
-            <size>
-             <width>24</width>
-             <height>24</height>
-            </size>
-           </property>
-           <property name="text">
-            <string>&gt;</string>
-           </property>
-          </widget>
-         </item>
-         <item>
           <layout class="QHBoxLayout" name="horizontalLayout">
            <property name="sizeConstraint">
             <enum>QLayout::SetMinimumSize</enum>
            </property>
            <item>
-            <widget class="QLabel" name="label_frameNo">
+            <widget class="QPushButton" name="pushButton_prevFrame">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
              <property name="sizePolicy">
-              <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+              <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
                <horstretch>0</horstretch>
                <verstretch>0</verstretch>
               </sizepolicy>
@@ -192,7 +190,60 @@
              </property>
              <property name="maximumSize">
               <size>
-               <width>16777215</width>
+               <width>24</width>
+               <height>24</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>&lt;</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="pushButton_nextFrame">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="minimumSize">
+              <size>
+               <width>0</width>
+               <height>24</height>
+              </size>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>24</width>
+               <height>24</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>&gt;</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_frameNo">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="minimumSize">
+              <size>
+               <width>200</width>
+               <height>24</height>
+              </size>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>200</width>
                <height>24</height>
               </size>
              </property>
@@ -265,23 +316,26 @@
       </item>
      </layout>
     </item>
-    <item row="2" column="4">
-     <widget class="QWidget" name="widget_2" native="true"/>
-    </item>
     <item row="3" column="0" colspan="4">
      <widget class="QSlider" name="horizontalSlider">
       <property name="enabled">
        <bool>false</bool>
       </property>
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
       <property name="minimumSize">
        <size>
-        <width>0</width>
+        <width>600</width>
         <height>10</height>
        </size>
       </property>
       <property name="maximumSize">
        <size>
-        <width>16777215</width>
+        <width>800</width>
         <height>10</height>
        </size>
       </property>
@@ -300,24 +354,31 @@
       </property>
       <property name="minimumSize">
        <size>
-        <width>0</width>
-        <height>400</height>
+        <width>300</width>
+        <height>420</height>
        </size>
       </property>
       <property name="maximumSize">
        <size>
-        <width>16777215</width>
-        <height>400</height>
+        <width>300</width>
+        <height>420</height>
        </size>
       </property>
       <property name="title">
        <string>Commands</string>
       </property>
       <layout class="QGridLayout" name="gridLayout_2">
-       <item row="0" column="0">
-        <widget class="QPushButton" name="pushButton_com_0">
+       <item row="3" column="2">
+        <widget class="QCheckBox" name="checkBox_3">
          <property name="text">
-          <string>Status</string>
+          <string/>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="2">
+        <widget class="QCheckBox" name="checkBox_4">
+         <property name="text">
+          <string/>
          </property>
         </widget>
        </item>
@@ -337,26 +398,62 @@
          </property>
         </widget>
        </item>
-       <item row="14" column="0">
-        <widget class="QPushButton" name="pushButton_com_13">
+       <item row="10" column="0">
+        <widget class="QPushButton" name="pushButton_com_9">
          <property name="text">
-          <string>MSG after</string>
+          <string>Start stream</string>
          </property>
         </widget>
        </item>
-       <item row="11" column="3">
-        <widget class="QLineEdit" name="lineEdit_com_10">
-         <property name="minimumSize">
-          <size>
-           <width>150</width>
-           <height>0</height>
-          </size>
+       <item row="0" column="2">
+        <widget class="QCheckBox" name="checkBox_0">
+         <property name="text">
+          <string/>
          </property>
-         <property name="maximumSize">
-          <size>
-           <width>150</width>
-           <height>16777215</height>
-          </size>
+         <property name="checkable">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="2">
+        <widget class="QCheckBox" name="checkBox_1">
+         <property name="text">
+          <string/>
+         </property>
+        </widget>
+       </item>
+       <item row="14" column="2">
+        <widget class="QCheckBox" name="checkBox_13">
+         <property name="text">
+          <string/>
+         </property>
+        </widget>
+       </item>
+       <item row="7" column="0">
+        <widget class="QPushButton" name="pushButton_com_6">
+         <property name="text">
+          <string>Reset</string>
+         </property>
+        </widget>
+       </item>
+       <item row="13" column="0">
+        <widget class="QPushButton" name="pushButton_com_12">
+         <property name="text">
+          <string>Words after</string>
+         </property>
+        </widget>
+       </item>
+       <item row="13" column="2">
+        <widget class="QCheckBox" name="checkBox_12">
+         <property name="text">
+          <string/>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="2">
+        <widget class="QCheckBox" name="checkBox_5">
+         <property name="text">
+          <string/>
          </property>
         </widget>
        </item>
@@ -376,99 +473,22 @@
          </property>
         </widget>
        </item>
-       <item row="1" column="0">
-        <widget class="QPushButton" name="pushButton_com_1">
+       <item row="4" column="0">
+        <widget class="QPushButton" name="pushButton_com_4">
          <property name="text">
-          <string>Compilation Time</string>
+          <string>Scan rate</string>
          </property>
         </widget>
        </item>
-       <item row="5" column="0">
-        <widget class="QPushButton" name="pushButton_com_5">
+       <item row="9" column="0">
+        <widget class="QPushButton" name="pushButton_com_8">
          <property name="text">
-          <string>Scan mode</string>
+          <string>Offset correction</string>
          </property>
         </widget>
        </item>
-       <item row="12" column="2">
-        <widget class="QCheckBox" name="checkBox_11">
-         <property name="text">
-          <string/>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="0">
-        <widget class="QPushButton" name="pushButton_com_2">
-         <property name="text">
-          <string>N lines</string>
-         </property>
-        </widget>
-       </item>
-       <item row="10" column="0">
-        <widget class="QPushButton" name="pushButton_com_9">
-         <property name="text">
-          <string>Start stream</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="2">
-        <widget class="QCheckBox" name="checkBox_2">
-         <property name="text">
-          <string/>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="2">
-        <widget class="QCheckBox" name="checkBox_1">
-         <property name="text">
-          <string/>
-         </property>
-        </widget>
-       </item>
-       <item row="5" column="2">
-        <widget class="QCheckBox" name="checkBox_5">
-         <property name="text">
-          <string/>
-         </property>
-        </widget>
-       </item>
-       <item row="15" column="0" colspan="4">
-        <widget class="QPushButton" name="pushButton_run">
-         <property name="text">
-          <string>Run</string>
-         </property>
-        </widget>
-       </item>
-       <item row="11" column="0">
-        <widget class="QPushButton" name="pushButton_com_10">
-         <property name="text">
-          <string>Read stream</string>
-         </property>
-        </widget>
-       </item>
-       <item row="14" column="2">
-        <widget class="QCheckBox" name="checkBox_13">
-         <property name="text">
-          <string/>
-         </property>
-        </widget>
-       </item>
-       <item row="4" column="2">
-        <widget class="QCheckBox" name="checkBox_4">
-         <property name="text">
-          <string/>
-         </property>
-        </widget>
-       </item>
-       <item row="8" column="0">
-        <widget class="QPushButton" name="pushButton_com_7">
-         <property name="text">
-          <string>Drift correction</string>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="2">
-        <widget class="QCheckBox" name="checkBox_3">
+       <item row="9" column="2">
+        <widget class="QCheckBox" name="checkBox_8">
          <property name="text">
           <string/>
          </property>
@@ -481,10 +501,24 @@
          </property>
         </widget>
        </item>
-       <item row="9" column="0">
-        <widget class="QPushButton" name="pushButton_com_8">
+       <item row="15" column="0">
+        <widget class="QPushButton" name="pushButton_com_14">
          <property name="text">
-          <string>Offset correction</string>
+          <string>PushButton</string>
+         </property>
+        </widget>
+       </item>
+       <item row="8" column="2">
+        <widget class="QCheckBox" name="checkBox_7">
+         <property name="text">
+          <string/>
+         </property>
+        </widget>
+       </item>
+       <item row="17" column="0" colspan="4">
+        <widget class="QPushButton" name="pushButton_run">
+         <property name="text">
+          <string>Run</string>
          </property>
         </widget>
        </item>
@@ -495,46 +529,36 @@
          </property>
         </widget>
        </item>
-       <item row="7" column="0">
-        <widget class="QPushButton" name="pushButton_com_6">
+       <item row="2" column="0">
+        <widget class="QPushButton" name="pushButton_com_2">
          <property name="text">
-          <string>Reset</string>
+          <string>N lines</string>
          </property>
         </widget>
        </item>
-       <item row="13" column="2">
-        <widget class="QCheckBox" name="checkBox_12">
-         <property name="text">
-          <string/>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="2">
-        <widget class="QCheckBox" name="checkBox_0">
-         <property name="text">
-          <string/>
-         </property>
-         <property name="checkable">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item row="9" column="2">
-        <widget class="QCheckBox" name="checkBox_8">
+       <item row="11" column="2">
+        <widget class="QCheckBox" name="checkBox_10">
          <property name="text">
           <string/>
          </property>
         </widget>
        </item>
-       <item row="4" column="0">
-        <widget class="QPushButton" name="pushButton_com_4">
+       <item row="14" column="0">
+        <widget class="QPushButton" name="pushButton_com_13">
          <property name="text">
-          <string>Scan rate</string>
+          <string>MSG after</string>
          </property>
         </widget>
        </item>
-       <item row="7" column="2">
-        <widget class="QCheckBox" name="checkBox_6">
+       <item row="0" column="0">
+        <widget class="QPushButton" name="pushButton_com_0">
+         <property name="text">
+          <string>Status</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="2">
+        <widget class="QCheckBox" name="checkBox_2">
          <property name="text">
           <string/>
          </property>
@@ -547,24 +571,82 @@
          </property>
         </widget>
        </item>
-       <item row="13" column="0">
-        <widget class="QPushButton" name="pushButton_com_12">
-         <property name="text">
-          <string>Words after</string>
-         </property>
-        </widget>
-       </item>
-       <item row="11" column="2">
-        <widget class="QCheckBox" name="checkBox_10">
+       <item row="7" column="2">
+        <widget class="QCheckBox" name="checkBox_6">
          <property name="text">
           <string/>
          </property>
         </widget>
        </item>
-       <item row="8" column="2">
-        <widget class="QCheckBox" name="checkBox_7">
+       <item row="12" column="2">
+        <widget class="QCheckBox" name="checkBox_11">
          <property name="text">
           <string/>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QPushButton" name="pushButton_com_1">
+         <property name="text">
+          <string>Compilation Time</string>
+         </property>
+        </widget>
+       </item>
+       <item row="8" column="0">
+        <widget class="QPushButton" name="pushButton_com_7">
+         <property name="text">
+          <string>Drift correction</string>
+         </property>
+        </widget>
+       </item>
+       <item row="11" column="0">
+        <widget class="QPushButton" name="pushButton_com_10">
+         <property name="text">
+          <string>Read stream</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="0">
+        <widget class="QPushButton" name="pushButton_com_5">
+         <property name="text">
+          <string>Scan mode</string>
+         </property>
+        </widget>
+       </item>
+       <item row="16" column="0">
+        <widget class="QPushButton" name="pushButton_com_15">
+         <property name="text">
+          <string>PushButton</string>
+         </property>
+        </widget>
+       </item>
+       <item row="15" column="2">
+        <widget class="QCheckBox" name="checkBox_14">
+         <property name="text">
+          <string/>
+         </property>
+        </widget>
+       </item>
+       <item row="16" column="2">
+        <widget class="QCheckBox" name="checkBox_15">
+         <property name="text">
+          <string/>
+         </property>
+        </widget>
+       </item>
+       <item row="13" column="3">
+        <widget class="QLineEdit" name="lineEdit_com_12">
+         <property name="minimumSize">
+          <size>
+           <width>150</width>
+           <height>0</height>
+          </size>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>150</width>
+           <height>16777215</height>
+          </size>
          </property>
         </widget>
        </item>
@@ -575,24 +657,55 @@
      <widget class="QCustomPlot" name="plotMap" native="true">
       <property name="minimumSize">
        <size>
-        <width>430</width>
+        <width>400</width>
         <height>400</height>
+       </size>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>800</width>
+        <height>16777215</height>
        </size>
       </property>
      </widget>
     </item>
-    <item row="2" column="5">
-     <widget class="QWidget" name="widget_3" native="true"/>
-    </item>
-    <item row="4" column="4" colspan="2">
-     <widget class="QWidget" name="widget" native="true">
+    <item row="4" column="4">
+     <widget class="QCustomPlot" name="plotMapMean" native="true">
       <property name="minimumSize">
        <size>
-        <width>430</width>
-        <height>400</height>
+        <width>600</width>
+        <height>0</height>
+       </size>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>800</width>
+        <height>16777215</height>
        </size>
       </property>
      </widget>
+    </item>
+    <item row="4" column="5">
+     <widget class="QCustomPlot" name="plotMapSigma" native="true">
+      <property name="minimumSize">
+       <size>
+        <width>600</width>
+        <height>0</height>
+       </size>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>800</width>
+        <height>16777215</height>
+       </size>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="4" rowspan="2">
+     <widget class="QCustomPlot" name="histMean" native="true"/>
+    </item>
+    <item row="2" column="5" rowspan="2">
+     <widget class="QCustomPlot" name="histSigma" native="true"/>
     </item>
    </layout>
   </widget>
@@ -601,7 +714,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1069</width>
+     <width>1856</width>
      <height>21</height>
     </rect>
    </property>

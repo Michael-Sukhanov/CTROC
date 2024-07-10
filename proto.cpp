@@ -117,7 +117,7 @@ quint16 ScanData::getFramesCount() const{return framesCount;}
 
 
 
-Frame::Frame(ScanData *sd, quint16 frameNo){
+Frame::Frame(ScanData *sd, quint16 frameNo):fp(FrameSINGL){
     bpp = sd->getBytesPerPixel(), sizeX = sd->getSizeX(), sizeZ = sd->getSizeZ();
     quint32 step = bpp * sizeX * sizeZ + 32;
     header = *reinterpret_cast<FrameHeader*>(sd->getData() + frameNo * step);
@@ -125,21 +125,52 @@ Frame::Frame(ScanData *sd, quint16 frameNo){
     // bpp = sd->getBytesPerPixel();
 }
 
-quint32 Frame::max(){
-    quint32 result = 0;
-    for(auto i = 0; i < sizeX * sizeZ; ++i){
-        quint32 tmp = (*reinterpret_cast<quint32*>(data + i * bpp) & ((0x1 << bpp * 8) - 1));
-        if(result < tmp)
-            result = tmp;
+Frame::Frame(QVector<Frame>::iterator start, QVector<Frame>::iterator stop, FramePurpose purpose, Frame* mean):bpp(2),sizeX(80),sizeZ(32),fp(purpose){
+    data = new char[sizeof(float) * sizeX * sizeZ];
+    if(purpose == FrameMEAN){
+        for(auto k = 0; k < sizeX * sizeZ; k++){
+            float mnVal = 0;
+            for(auto i = start; i != stop; ++i){
+                mnVal += (*i)(k / sizeX, k % sizeX);
+            }
+            *reinterpret_cast<float*>(data + k * sizeof(float)) = mnVal / (stop - start);
+        }
     }
+
+    if(purpose == FrameSTDEV){
+        Frame* mn = mean;
+        if(!mn) mn = new Frame(start, stop, FrameMEAN);
+        for(auto k = 0; k < sizeX * sizeZ; k++){
+            float stdVal = 0;
+            for(auto i = start; i != stop; ++i){
+                stdVal += std::pow((*i)(k / sizeX, k % sizeX) - (*mn)(k / sizeX, k % sizeX), 2);
+            }
+            *reinterpret_cast<float*>(data + k * sizeof(float)) = std::sqrt(stdVal / (stop - start - 1));
+        }
+    }
+}
+
+float Frame::max(){
+    float result = 0;
+    for(auto x = 0; x < sizeX; ++x)
+        for(auto z = 0; z < sizeZ; ++z)
+            if(result < (*this)(z, x)) result = (*this)(z, x);
+    return result;
+}
+
+float Frame::min(){
+    float result = (*this)(0,0);
+    for(auto x = 0; x < sizeX; ++x)
+        for(auto z = 0; z < sizeZ; ++z)
+            if(result > (*this)(z, x)) result = (*this)(z, x);
     return result;
 }
 
 void Frame::show(){
-    qDebug() << header.pixels_in_frame << header.frame_flags0 << header.frame_flags1;
-    for(auto i = 0; i <sizeZ * bpp; ++i)
-        for(auto k = 0; k < sizeX * bpp; ++k)
-            qDebug() << data[(i * sizeX + k) * bpp];
+    if(fp == FrameSINGL) qDebug() << header.pixels_in_frame << header.frame_flags0 << header.frame_flags1;
+    for(auto z = 0; z <sizeZ; ++z)
+        for(auto x = 0; x < sizeX; ++x)
+            qDebug() << (*this)(z, x);
 }
 
 QString makeCommand(quint16 commandPipeline, Ranges *ranges, quint32 *scanRate, quint32 *readNum){
@@ -147,7 +178,7 @@ QString makeCommand(quint16 commandPipeline, Ranges *ranges, quint32 *scanRate, 
     for(auto i = 0; i < COMMANDS.size(); ++i){
         QString temp = COMMANDS[i];
         if((1 << i) == Command::ADCrange && ranges)
-            for(auto i = 0; i < 10; ++i) temp += " " + QString::number(ranges->values[i]);
+            for(auto k = 0; k < 10; ++k) temp += " " + QString::number(ranges->values[k]);
         if((1 << i) == Command::Scanrate && scanRate)  temp += " " + QString::number(*scanRate);
         if((1 << i) == Command::ReadStream && readNum) temp += " " + QString::number(*readNum);
         if(commandPipeline & (1 << i)) retValue.append(temp);
@@ -169,7 +200,7 @@ RunContent::RunContent(Run * r){
         if(-1 != el.indexOf("Total ADC lines")){
             maskUpdated |= Command::Nlines; sscanf_s(el.toStdString().c_str(), "Total ADC lines: %d", &numLines);
         }
-        if(-1 != el.indexOf("ADC drift offset correction ON")){
+        if(-1 != el.indexOf("ADC drift correction ON")){
             maskUpdated |= Command::Drift;
             int idxOfMsgs = list.indexOf("MSG SUCSESS", list.indexOf(el));
             driftCorrection = 1;
@@ -215,8 +246,7 @@ RunContent::RunContent(Run * r){
             int brackLeft = list[idxOfThisEl + 1].indexOf("(") + 1;
             scanRate = list[idxOfThisEl + 1].mid(brackLeft, list[idxOfThisEl + 1].indexOf(")") - brackLeft).toUInt();
         }
-        if(-1 != el.indexOf("Reset MODE reg")) maskUpdated |= Command::ScanMode;
-        if(-1 != el.indexOf("Start data reading")) maskUpdated |= Command::StartStream;
+        if(-1 != el.indexOf("Set CONV on")) maskUpdated |= Command::ScanMode;
         if(-1 != el.indexOf("left in FIFO after ADC data read")){
             maskUpdated |= Command::RemainWords;
             sscanf_s(el.toStdString().c_str(), "%u data words left in FIFO after data read", &FIFOpayload);
@@ -238,5 +268,8 @@ RunContent::RunContent(Run * r){
                 readerrCode = 0;
             }
         }
+        if(-1 != el.indexOf("KADR on"))  maskUpdated |= Command::kadr_on;
+        if(-1 != el.indexOf("KADR off")) maskUpdated |= Command::kadr_off;
+        if(-1 != el.indexOf("MUX"))      maskUpdated |= Command::mux_adc;
     }
 }

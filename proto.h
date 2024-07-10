@@ -8,20 +8,41 @@
 #include <iostream>
 
 namespace Command{
-const quint16 Status      = 0x0001,
-              CompileTime = 0x0002,
-              Nlines      = 0x0004,
-              ADCrange    = 0x0008,
-              Scanrate    = 0x0010,
-              ScanMode    = 0x0020,
-              Reset       = 0x0040,
-              Drift       = 0x0080,
-              Offset      = 0x0100,
-              StartStream = 0x0200,
-              ReadStream  = 0x0400,
-              Temperature = 0x0800,
-              RemainWords = 0x1000,
-              EndMessage  = 0x2000;
+const quint16 bitNo_Status      =  0, Status      = (1 << bitNo_Status     ),
+              bitNo_CompileTime =  1, CompileTime = (1 << bitNo_CompileTime),
+              bitNo_Nlines      =  2, Nlines      = (1 << bitNo_Nlines     ),
+              bitNo_ADCrange    =  3, ADCrange    = (1 << bitNo_ADCrange   ),
+              bitNo_Scanrate    =  4, Scanrate    = (1 << bitNo_Scanrate   ),
+              bitNo_mux_adc     =  5, mux_adc     = (1 << bitNo_mux_adc    ),
+              bitNo_ScanMode    =  6, ScanMode    = (1 << bitNo_ScanMode   ),
+              bitNo_kadr_off    =  7, kadr_off    = (1 << bitNo_kadr_off   ),
+              bitNo_Reset       =  8, Reset       = (1 << bitNo_Reset      ),
+              bitNo_Drift       =  9, Drift       = (1 << bitNo_Drift      ),
+              bitNo_Offset      = 10, Offset      = (1 << bitNo_Offset     ),
+              bitNo_kadr_on     = 11, kadr_on     = (1 << bitNo_kadr_on    ),
+              bitNo_ReadStream  = 12, ReadStream  = (1 << bitNo_ReadStream ),
+              bitNo_Temperature = 13, Temperature = (1 << bitNo_Temperature),
+              bitNo_RemainWords = 14, RemainWords = (1 << bitNo_RemainWords),
+              bitNo_EndMessage  = 15, EndMessage  = (1 << bitNo_EndMessage );
+};
+
+const QStringList COMMANDS ={
+    "status",       //0
+    "comptime",     //1
+    "nlines",       //2
+    "adc_range",    //3
+    "scanrate",     //4
+    "mux_adc",      //5
+    "scan_mode",    //6
+    "kadr_off",     //7
+    "reset",        //8
+    "drift",        //9
+    "offset",       //10
+    "kadr_on",      //11
+    "read_stream",  //12
+    "temp",         //13
+    "words_after",  //14
+    "msg_after"     //15
 };
 
 enum ADCrange{
@@ -40,22 +61,7 @@ struct Ranges
     ADCrange values[10];
 };
 
-const QStringList COMMANDS ={
-    "status",
-    "comptime",
-    "nlines",
-    "adc_range",
-    "scanrate",
-    "scan_mode",
-    "reset",
-    "drift",
-    "offset",
-    "start_stream",
-    "read_stream",
-    "temp",
-    "words_after",
-    "msg_after"
-};
+
 
 QString makeCommand(quint16 commandPipeline, Ranges *ranges = nullptr, quint32* scanRate = nullptr, quint32* readNum = nullptr);
 
@@ -161,20 +167,34 @@ struct FrameHeader {
     uint16_t reserved[2]; /* Pad to 32 bytes */
 };
 
+enum FramePurpose{
+    FrameMEAN,
+    FrameSTDEV,
+    FrameSINGL
+};
+
 struct Frame{
     FrameHeader header;
     char *data;
     quint8 bpp;
     quint16 sizeX, sizeZ;
+    FramePurpose fp;
 
     Frame(ScanData* sd, quint16 frameNo);
-    const quint32 operator()(int z, int x) const {
-        return (*reinterpret_cast<quint32*>(data + (z * sizeX + x) * bpp) & ((0x1 << bpp * 8) - 1));
+    Frame(QVector<Frame>::iterator start, QVector<Frame>::iterator stop, FramePurpose purpose = FrameMEAN, Frame* mean = nullptr);
+    const float operator()(int z, int x) const {
+        if(fp == FrameSINGL)
+            return static_cast<float>(*reinterpret_cast<quint32*>(data + (z * sizeX + x) * bpp) & ((0x1 << bpp * 8) - 1));
+        else
+            return *reinterpret_cast<float*>(data + (z * sizeX + x) * sizeof(float));
     }
 
-    quint32 max();
+    float max();
+    float min();
     void show();
 };
+
+
 
 struct RunContent{
     float ADCtemperature;
