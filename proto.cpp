@@ -121,19 +121,21 @@ Frame::Frame(ScanData *sd, quint16 frameNo):fp(FrameSINGL){
     bpp = sd->getBytesPerPixel(), sizeX = sd->getSizeX(), sizeZ = sd->getSizeZ();
     quint32 step = bpp * sizeX * sizeZ + 32;
     header = *reinterpret_cast<FrameHeader*>(sd->getData() + frameNo * step);
-    data = sd->getData() + frameNo * step + 32;
+    data = new float[sizeX * sizeZ];
+    for(auto i = 0; i < sizeX * sizeZ; ++i)
+        data[i] = *reinterpret_cast<quint16*>(sd->getData() + frameNo * step + 32 + i * bpp);
     // bpp = sd->getBytesPerPixel();
 }
 
-Frame::Frame(QVector<Frame>::iterator start, QVector<Frame>::iterator stop, FramePurpose purpose, Frame* mean):bpp(2),sizeX(80),sizeZ(32),fp(purpose){
-    data = new char[sizeof(float) * sizeX * sizeZ];
-    if(purpose == FrameMEAN){
+Frame::Frame(QVector<Frame>::iterator start, QVector<Frame>::iterator stop, FramePurpose purpose, Frame* mean, quint16 _sX, quint16 _sZ):bpp(2),sizeX(_sX),sizeZ(_sZ),fp(purpose){
+    data = new float[sizeX * sizeZ];
+    if(purpose == FrameMEAN || purpose == FrameDARK){
         for(auto k = 0; k < sizeX * sizeZ; k++){
             float mnVal = 0;
             for(auto i = start; i != stop; ++i){
                 mnVal += (*i)(k / sizeX, k % sizeX);
             }
-            *reinterpret_cast<float*>(data + k * sizeof(float)) = mnVal / (stop - start);
+            data[k] = mnVal / (stop - start);
         }
     }
 
@@ -145,25 +147,75 @@ Frame::Frame(QVector<Frame>::iterator start, QVector<Frame>::iterator stop, Fram
             for(auto i = start; i != stop; ++i){
                 stdVal += std::pow((*i)(k / sizeX, k % sizeX) - (*mn)(k / sizeX, k % sizeX), 2);
             }
-            *reinterpret_cast<float*>(data + k * sizeof(float)) = std::sqrt(stdVal / (stop - start - 1));
+            data[k] = std::sqrt(stdVal / (stop - start - 1));
+        }
+        if(mn && (mn != mean)) delete mn;
+    }
+}
+
+Frame::Frame(FramePurpose purpose, QString fileName, quint16 _sX, quint16 _sZ):bpp(2),sizeX(_sX),sizeZ(_sZ),fp(purpose){
+    size_t sz = sizeX * sizeZ;
+    data = new float[sz];
+    if(QFile::exists(fileName)){
+        QFile input(fileName);
+        input.open(QIODevice::ReadOnly);
+        input.read(reinterpret_cast<char*>(data), sz * sizeof(float));
+        input.close();
+    }else{
+        if(purpose == FrameDARK){
+            for(auto i = 0; i < sizeX*sizeZ; ++i)
+                data[i] = 0.0;;
+        }else if(purpose == FrameLIGHT){
+            for(auto i = 0; i < sizeX*sizeZ; ++i)
+                data[i] = 1.0;
         }
     }
 }
 
+Frame::Frame(const Frame &fr):header(fr.header),bpp(fr.bpp),sizeX(fr.sizeX),sizeZ(fr.sizeZ),fp(fr.fp),_max(fr._max),_min(fr._min),_mean(fr._mean){
+    data = new float[fr.sizeX * fr.sizeZ];
+    memcpy(data, fr.data, fr.sizeX * fr.sizeZ * sizeof(float));
+}
+
+Frame::~Frame(){
+
+}
+
+
+bool Frame::writeToFile(QString fileName){
+    QFile output(fileName);
+    output.open(QIODevice::WriteOnly);
+    quint64 res = output.write(reinterpret_cast<char*>(data), sizeX * sizeZ * sizeof(float));
+    output.close();
+    return res != -1;
+}
+
 float Frame::max(){
+    if(_max != -1) return _max;
     float result = 0;
     for(auto x = 0; x < sizeX; ++x)
         for(auto z = 0; z < sizeZ; ++z)
             if(result < (*this)(z, x)) result = (*this)(z, x);
-    return result;
+    _max = result;
+    return _max;
 }
 
 float Frame::min(){
+    if(_min != -1) return _min;
     float result = (*this)(0,0);
     for(auto x = 0; x < sizeX; ++x)
         for(auto z = 0; z < sizeZ; ++z)
             if(result > (*this)(z, x)) result = (*this)(z, x);
-    return result;
+    _min = result;
+    return _min;
+}
+
+float Frame::mean(){
+    if(_mean != -1) return _mean;
+    float res = 0;
+    for(auto i = 0; i < sizeX*sizeZ; ++i) res += data[i];
+    _mean = res/(sizeX * sizeZ);
+    return _mean;
 }
 
 void Frame::show(){
@@ -191,7 +243,13 @@ Run::Run(QByteArray &_ba):Response(_ba){
 }
 Run::~Run(){}
 
-RunContent::RunContent(Run * r){
+RunContent::RunContent(Run * rc):scanRate(0XFFFFFFFF){
+    for(auto i = 0; i < 10; ++i)
+        this->rngs.values[i] = ADC_RANGE_NULL;
+    if(rc) this->update(rc);
+}
+
+void RunContent::update(Run *r){
     maskUpdated = 0;
     QStringList list =  QString(QByteArray(r->getData(), r->getContentLength())).split("\n");
     qDebug() << list;

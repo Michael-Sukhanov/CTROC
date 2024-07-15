@@ -4,11 +4,12 @@
 
 int main(int argc, char *argv[])
 {
+
+    QCoreApplication::setApplicationName("CTROC");
+    QCoreApplication::setOrganizationName("INR");
+
     QApplication a(argc, argv);
-    MainWindow *w;
-    if(argc == 1) w = new MainWindow();
-    if(argc == 2) w = new MainWindow(QString(argv[1]));
-    if(argc == 3) w = new MainWindow(QString(argv[1]), QString(argv[2]).toUInt());
-    w->show();
+    MainWindow w;
+    w.show();
     return a.exec();
 }

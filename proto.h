@@ -6,6 +6,7 @@
 #include <QString>
 #include <QStringList>
 #include <iostream>
+#include <QFile>
 
 namespace Command{
 const quint16 bitNo_Status      =  0, Status      = (1 << bitNo_Status     ),
@@ -53,7 +54,8 @@ enum ADCrange{
     ADC_RANGE_6_25pC = 4,
     ADC_RANGE_150pC  = 5,
     ADC_RANGE_75pC   = 6,
-    ADC_RANGE_37_5pC = 7
+    ADC_RANGE_37_5pC = 7,
+    ADC_RANGE_NULL   = 8
 };
 
 struct Ranges
@@ -170,27 +172,34 @@ struct FrameHeader {
 enum FramePurpose{
     FrameMEAN,
     FrameSTDEV,
-    FrameSINGL
+    FrameSINGL,
+    FrameDARK,
+    FrameLIGHT
 };
 
 struct Frame{
     FrameHeader header;
-    char *data;
+    float *data;
     quint8 bpp;
     quint16 sizeX, sizeZ;
     FramePurpose fp;
+    float _max = -1, _min = -1, _mean = -1;
 
     Frame(ScanData* sd, quint16 frameNo);
-    Frame(QVector<Frame>::iterator start, QVector<Frame>::iterator stop, FramePurpose purpose = FrameMEAN, Frame* mean = nullptr);
-    const float operator()(int z, int x) const {
-        if(fp == FrameSINGL)
-            return static_cast<float>(*reinterpret_cast<quint32*>(data + (z * sizeX + x) * bpp) & ((0x1 << bpp * 8) - 1));
-        else
-            return *reinterpret_cast<float*>(data + (z * sizeX + x) * sizeof(float));
+    Frame(QVector<Frame>::iterator start, QVector<Frame>::iterator stop, FramePurpose purpose = FrameMEAN, Frame* mean = nullptr, quint16 _sX = 80, quint16 _sZ = 32);
+    Frame(FramePurpose purpose = FrameDARK, QString fileName = "", quint16 _sX = 80, quint16 _sZ = 32);
+    Frame(const Frame &fr);
+
+    float& operator()(int z, int x){
+        return data[x + z * sizeX];
     }
 
+    ~Frame();
+
+    bool writeToFile(QString fileName);
     float max();
     float min();
+    float mean();
     void show();
 };
 
@@ -208,7 +217,8 @@ struct RunContent{
 
     quint16 maskUpdated;
 
-    RunContent(Run *);
+    RunContent(Run *rc = nullptr);
+    void update(Run *);
 };
 
 #endif // PROTO_H

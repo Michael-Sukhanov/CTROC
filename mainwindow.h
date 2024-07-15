@@ -5,6 +5,7 @@
 #include "client.h"
 #include <qcustomplot.h>
 #include <palettes.h>
+#include <QSettings>
 
 QCPColorGradient getGradient(const QList<QColor> &palette);
 
@@ -17,7 +18,7 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    MainWindow(QString _peer_IP = PEER_IP, quint16 _peer_port = PEER_PORT, QWidget *parent = nullptr);
+    MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
 private:
@@ -25,21 +26,40 @@ private:
     QCPColorMap *colorMap, *colorMapMean, *colorMapStd;
     QCPColorScale *colorScale, *colorScaleMean, *colorScaleStd;
     QCPBars *meanBars, *stdBars;
+
+    QString peerIP;
+    quint16 peerPort;
     Client *Tcpclient;
 
     QLineEdit *ADCRangeLE, *setRateLE, *readStreamLE;
 
     QVector<Frame> frames;
-    Frame *meanFrame, *stdevFrame;
+    Frame *meanFrame, *stdevFrame, *darkFrame, *lightFrame;
+    QString darkCalibFileName, lightCalibFileName;
 
     int currentframeIndex;
     float sampleMin, sampleMax;
 
-    void getFrames(ScanData *response, QVector<Frame> &);
+    bool darkFrameFlag, lightFrameFlag;
+    RunContent runContent;
+
+    void getRawFrames(ScanData *response, QVector<Frame> &);
     void runGUIControl(bool enabled);
+    void correctFrames(QVector<Frame>::iterator start, QVector<Frame>::iterator stop);
 
     quint16 getCorrespondingCommand(QWidget*);
     quint8 getCorrespondingBitNo(QWidget*);
+
+    //для работы с ini файлами
+    QSettings* settings;
+
+    void loadSettings();
+    void saveSettings();
+
+    QMessageBox msgBox;
+
+    //Получаем имя калибровочного файла на основе полученных в run content данных
+    QString getCalibrationFileName(FramePurpose fp);
 
 private slots:
     void updateMap(Frame &, QCustomPlot *&plot, QCPColorMap* &cmap, float* sampMin = nullptr, float* sampMax = nullptr);

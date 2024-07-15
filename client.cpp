@@ -15,7 +15,7 @@ Client::Client(QString _peerIP, quint16 _peer_port, int _connectionTimeout, QObj
     connect(sockData , &QTcpSocket::readyRead, this, &Client::read);
     connect(sockRun  , &QTcpSocket::readyRead, this, &Client::read);
 
-    timeLog = new std::ofstream("timingLog.dat",std::ios_base::app);
+    // timeLog = new std::ofstream("timingLog.dat",std::ios_base::app);
 }
 
 void Client::getMetaInfo(){
@@ -51,7 +51,7 @@ void Client::getScanData(quint16 ln, quint16 ff, quint16 fc){
     }
 }
 
-void Client::getLaslScan(){
+void Client::getLastScan(){
     delete dataResponse;
     dataResponse = nullptr;
     try{

@@ -28,7 +28,7 @@ public slots:
     void getMetaInfo   ();
     void getScanState  ();
     void getScanData   (quint16, quint16, quint16);
-    void getLaslScan   ();
+    void getLastScan   ();
     void sendRunCommand(quint16 mask, Ranges *ranges = nullptr, quint32 *scanRate = nullptr, quint32 *readNum = nullptr);
 
 signals:
@@ -41,7 +41,7 @@ private:
     quint16 portInfo = 0, portState = 0, portData = 0, portRun = 0, peerPort;
     QString peerIP;
     int connectionTimeout;
-    std::ofstream* timeLog;
+    // std::ofstream* timeLog;
     QTime requestDataSent, requestMetaSent, requestStateSent, requestRunCommand;
 
     QTcpSocket *sockInfo, *sockData, *sockState, *sockRun;
