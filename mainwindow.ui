@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1920</width>
-    <height>1194</height>
+    <width>1200</width>
+    <height>995</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -18,7 +18,7 @@
   </property>
   <property name="minimumSize">
    <size>
-    <width>1920</width>
+    <width>1200</width>
     <height>0</height>
    </size>
   </property>
@@ -32,11 +32,32 @@
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralwidget">
+   <property name="sizePolicy">
+    <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+     <horstretch>0</horstretch>
+     <verstretch>0</verstretch>
+    </sizepolicy>
+   </property>
    <layout class="QGridLayout" name="gridLayout_8">
+    <property name="leftMargin">
+     <number>1</number>
+    </property>
+    <property name="topMargin">
+     <number>1</number>
+    </property>
+    <property name="rightMargin">
+     <number>1</number>
+    </property>
+    <property name="bottomMargin">
+     <number>1</number>
+    </property>
+    <property name="spacing">
+     <number>1</number>
+    </property>
     <item row="0" column="0">
      <widget class="QFrame" name="frame">
       <property name="sizePolicy">
-       <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+       <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
         <horstretch>0</horstretch>
         <verstretch>0</verstretch>
        </sizepolicy>
@@ -54,6 +75,21 @@
        <enum>QFrame::Raised</enum>
       </property>
       <layout class="QGridLayout" name="gridLayout_6">
+       <property name="leftMargin">
+        <number>1</number>
+       </property>
+       <property name="topMargin">
+        <number>1</number>
+       </property>
+       <property name="rightMargin">
+        <number>1</number>
+       </property>
+       <property name="bottomMargin">
+        <number>1</number>
+       </property>
+       <property name="spacing">
+        <number>1</number>
+       </property>
        <item row="1" column="0">
         <widget class="QGroupBox" name="groupBox_3">
          <property name="sizePolicy">
@@ -66,6 +102,21 @@
           <string>Dark Calibration</string>
          </property>
          <layout class="QGridLayout" name="gridLayout_3">
+          <property name="leftMargin">
+           <number>1</number>
+          </property>
+          <property name="topMargin">
+           <number>1</number>
+          </property>
+          <property name="rightMargin">
+           <number>1</number>
+          </property>
+          <property name="bottomMargin">
+           <number>1</number>
+          </property>
+          <property name="spacing">
+           <number>1</number>
+          </property>
           <item row="0" column="0" colspan="2">
            <widget class="QPushButton" name="pushButton_darkCalib">
             <property name="sizePolicy">
@@ -126,6 +177,21 @@
           <string>SINGLE REQUESTS</string>
          </property>
          <layout class="QGridLayout" name="gridLayout_5">
+          <property name="leftMargin">
+           <number>1</number>
+          </property>
+          <property name="topMargin">
+           <number>1</number>
+          </property>
+          <property name="rightMargin">
+           <number>1</number>
+          </property>
+          <property name="bottomMargin">
+           <number>1</number>
+          </property>
+          <property name="spacing">
+           <number>1</number>
+          </property>
           <item row="0" column="0">
            <widget class="QGroupBox" name="groupBox_5">
             <property name="sizePolicy">
@@ -138,6 +204,21 @@
              <string>Full cycle</string>
             </property>
             <layout class="QGridLayout" name="gridLayout">
+             <property name="leftMargin">
+              <number>1</number>
+             </property>
+             <property name="topMargin">
+              <number>1</number>
+             </property>
+             <property name="rightMargin">
+              <number>1</number>
+             </property>
+             <property name="bottomMargin">
+              <number>1</number>
+             </property>
+             <property name="spacing">
+              <number>1</number>
+             </property>
              <item row="1" column="1">
               <widget class="QLabel" name="label">
                <property name="sizePolicy">
@@ -187,7 +268,10 @@
                 <enum>Qt::LeftToRight</enum>
                </property>
                <property name="text">
-                <string>1000</string>
+                <string>1024</string>
+               </property>
+               <property name="maxLength">
+                <number>8</number>
                </property>
                <property name="alignment">
                 <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -309,15 +393,15 @@
        <item row="0" column="1" rowspan="3">
         <widget class="QGroupBox" name="groupBox">
          <property name="sizePolicy">
-          <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+          <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
          </property>
          <property name="minimumSize">
           <size>
-           <width>280</width>
-           <height>420</height>
+           <width>236</width>
+           <height>308</height>
           </size>
          </property>
          <property name="maximumSize">
@@ -330,6 +414,21 @@
           <string>Commands</string>
          </property>
          <layout class="QGridLayout" name="gridLayout_2">
+          <property name="leftMargin">
+           <number>1</number>
+          </property>
+          <property name="topMargin">
+           <number>1</number>
+          </property>
+          <property name="rightMargin">
+           <number>1</number>
+          </property>
+          <property name="bottomMargin">
+           <number>1</number>
+          </property>
+          <property name="spacing">
+           <number>1</number>
+          </property>
           <item row="3" column="2">
            <widget class="QCheckBox" name="checkBox_3">
             <property name="text">
@@ -346,9 +445,15 @@
           </item>
           <item row="3" column="3">
            <widget class="QLineEdit" name="lineEdit_com_3">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
             <property name="minimumSize">
              <size>
-              <width>100</width>
+              <width>60</width>
               <height>0</height>
              </size>
             </property>
@@ -358,12 +463,15 @@
               <height>16777215</height>
              </size>
             </property>
+            <property name="text">
+             <string>5555555555555555</string>
+            </property>
            </widget>
           </item>
           <item row="10" column="0">
            <widget class="QPushButton" name="pushButton_com_9">
             <property name="text">
-             <string>Start stream</string>
+             <string>Reset</string>
             </property>
            </widget>
           </item>
@@ -394,14 +502,14 @@
           <item row="7" column="0">
            <widget class="QPushButton" name="pushButton_com_6">
             <property name="text">
-             <string>Reset</string>
+             <string>Scan mode</string>
             </property>
            </widget>
           </item>
           <item row="13" column="0">
            <widget class="QPushButton" name="pushButton_com_12">
             <property name="text">
-             <string>Words after</string>
+             <string>kadr ON</string>
             </property>
            </widget>
           </item>
@@ -445,7 +553,7 @@
           <item row="9" column="0">
            <widget class="QPushButton" name="pushButton_com_8">
             <property name="text">
-             <string>Offset correction</string>
+             <string>MSG after</string>
             </property>
            </widget>
           </item>
@@ -466,23 +574,7 @@
           <item row="15" column="0">
            <widget class="QPushButton" name="pushButton_com_14">
             <property name="text">
-             <string>PushButton</string>
-            </property>
-           </widget>
-          </item>
-          <item row="13" column="3">
-           <widget class="QLineEdit" name="lineEdit_com_12">
-            <property name="minimumSize">
-             <size>
-              <width>100</width>
-              <height>0</height>
-             </size>
-            </property>
-            <property name="maximumSize">
-             <size>
-              <width>150</width>
-              <height>16777215</height>
-             </size>
+             <string>Temperature</string>
             </property>
            </widget>
           </item>
@@ -510,21 +602,21 @@
           <item row="16" column="0">
            <widget class="QPushButton" name="pushButton_com_15">
             <property name="text">
-             <string>PushButton</string>
+             <string>Words after</string>
             </property>
            </widget>
           </item>
           <item row="12" column="0">
            <widget class="QPushButton" name="pushButton_com_11">
             <property name="text">
-             <string>Temperature</string>
+             <string>Drift correction</string>
             </property>
            </widget>
           </item>
           <item row="2" column="0">
            <widget class="QPushButton" name="pushButton_com_2">
             <property name="text">
-             <string>N lines</string>
+             <string>№ of lines</string>
             </property>
            </widget>
           </item>
@@ -538,7 +630,7 @@
           <item row="14" column="0">
            <widget class="QPushButton" name="pushButton_com_13">
             <property name="text">
-             <string>MSG after</string>
+             <string>Read stream</string>
             </property>
            </widget>
           </item>
@@ -594,21 +686,37 @@
           <item row="8" column="0">
            <widget class="QPushButton" name="pushButton_com_7">
             <property name="text">
-             <string>Drift correction</string>
+             <string>kadr OFF</string>
             </property>
            </widget>
           </item>
           <item row="11" column="0">
            <widget class="QPushButton" name="pushButton_com_10">
             <property name="text">
-             <string>Read stream</string>
+             <string>Offset correction</string>
             </property>
            </widget>
           </item>
           <item row="5" column="0">
            <widget class="QPushButton" name="pushButton_com_5">
             <property name="text">
-             <string>Scan mode</string>
+             <string>Mux ADC</string>
+            </property>
+           </widget>
+          </item>
+          <item row="14" column="3">
+           <widget class="QLineEdit" name="lineEdit_com_13">
+            <property name="minimumSize">
+             <size>
+              <width>100</width>
+              <height>0</height>
+             </size>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>150</width>
+              <height>16777215</height>
+             </size>
             </property>
            </widget>
           </item>
@@ -627,6 +735,21 @@
           <string>Light Calibration</string>
          </property>
          <layout class="QGridLayout" name="gridLayout_4">
+          <property name="leftMargin">
+           <number>1</number>
+          </property>
+          <property name="topMargin">
+           <number>1</number>
+          </property>
+          <property name="rightMargin">
+           <number>1</number>
+          </property>
+          <property name="bottomMargin">
+           <number>1</number>
+          </property>
+          <property name="spacing">
+           <number>1</number>
+          </property>
           <item row="1" column="1">
            <widget class="QPushButton" name="pushButton_loadLight">
             <property name="maximumSize">
@@ -678,7 +801,7 @@
        <item row="3" column="0" colspan="2">
         <widget class="QTextEdit" name="textEdit_messages">
          <property name="sizePolicy">
-          <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+          <sizepolicy hsizetype="Preferred" vsizetype="Ignored">
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
@@ -686,7 +809,7 @@
          <property name="minimumSize">
           <size>
            <width>300</width>
-           <height>150</height>
+           <height>80</height>
           </size>
          </property>
          <property name="maximumSize">
@@ -694,6 +817,11 @@
            <width>800</width>
            <height>800</height>
           </size>
+         </property>
+         <property name="font">
+          <font>
+           <family>Consolas</family>
+          </font>
          </property>
          <property name="readOnly">
           <bool>true</bool>
@@ -706,14 +834,14 @@
     <item row="2" column="0">
      <widget class="QCustomPlot" name="plotMap" native="true">
       <property name="sizePolicy">
-       <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
+       <sizepolicy hsizetype="Fixed" vsizetype="MinimumExpanding">
         <horstretch>0</horstretch>
         <verstretch>0</verstretch>
        </sizepolicy>
       </property>
       <property name="minimumSize">
        <size>
-        <width>620</width>
+        <width>400</width>
         <height>400</height>
        </size>
       </property>
@@ -732,14 +860,14 @@ color: rgb(170, 0, 255);</string>
     <item row="2" column="2">
      <widget class="QCustomPlot" name="plotMapSigma" native="true">
       <property name="sizePolicy">
-       <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+       <sizepolicy hsizetype="Preferred" vsizetype="MinimumExpanding">
         <horstretch>0</horstretch>
         <verstretch>0</verstretch>
        </sizepolicy>
       </property>
       <property name="minimumSize">
        <size>
-        <width>620</width>
+        <width>400</width>
         <height>0</height>
        </size>
       </property>
@@ -758,14 +886,14 @@ color: rgb(170, 0, 255);</string>
     <item row="0" column="1" rowspan="2">
      <widget class="QCustomPlot" name="histMean" native="true">
       <property name="sizePolicy">
-       <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+       <sizepolicy hsizetype="Fixed" vsizetype="Ignored">
         <horstretch>0</horstretch>
         <verstretch>0</verstretch>
        </sizepolicy>
       </property>
       <property name="minimumSize">
        <size>
-        <width>620</width>
+        <width>400</width>
         <height>470</height>
        </size>
       </property>
@@ -799,6 +927,21 @@ color: rgb(170, 0, 255);</string>
        <string>Frames observer</string>
       </property>
       <layout class="QGridLayout" name="gridLayout_7">
+       <property name="leftMargin">
+        <number>1</number>
+       </property>
+       <property name="topMargin">
+        <number>1</number>
+       </property>
+       <property name="rightMargin">
+        <number>1</number>
+       </property>
+       <property name="bottomMargin">
+        <number>1</number>
+       </property>
+       <property name="spacing">
+        <number>1</number>
+       </property>
        <item row="0" column="0">
         <widget class="QPushButton" name="pushButton_prevFrame">
          <property name="enabled">
@@ -889,7 +1032,7 @@ color: rgb(170, 0, 255);</string>
           <bool>false</bool>
          </property>
          <property name="sizePolicy">
-          <sizepolicy hsizetype="Maximum" vsizetype="Minimum">
+          <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
@@ -917,14 +1060,14 @@ color: rgb(170, 0, 255);</string>
     <item row="2" column="1">
      <widget class="QCustomPlot" name="plotMapMean" native="true">
       <property name="sizePolicy">
-       <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+       <sizepolicy hsizetype="Preferred" vsizetype="MinimumExpanding">
         <horstretch>0</horstretch>
         <verstretch>0</verstretch>
        </sizepolicy>
       </property>
       <property name="minimumSize">
        <size>
-        <width>620</width>
+        <width>400</width>
         <height>0</height>
        </size>
       </property>
@@ -943,14 +1086,14 @@ color: rgb(170, 0, 255);</string>
     <item row="0" column="2" rowspan="2">
      <widget class="QCustomPlot" name="histSigma" native="true">
       <property name="sizePolicy">
-       <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+       <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
         <horstretch>0</horstretch>
         <verstretch>0</verstretch>
        </sizepolicy>
       </property>
       <property name="minimumSize">
        <size>
-        <width>620</width>
+        <width>400</width>
         <height>470</height>
        </size>
       </property>
@@ -968,17 +1111,6 @@ color: rgb(170, 0, 255);</string>
     </item>
    </layout>
   </widget>
-  <widget class="QMenuBar" name="menubar">
-   <property name="geometry">
-    <rect>
-     <x>0</x>
-     <y>0</y>
-     <width>1920</width>
-     <height>21</height>
-    </rect>
-   </property>
-  </widget>
-  <widget class="QStatusBar" name="statusbar"/>
  </widget>
  <customwidgets>
   <customwidget>

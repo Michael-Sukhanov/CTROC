@@ -2,6 +2,8 @@
 #include "qdebug.h"
 #include <iostream>
 
+quint8 nADC = 16;
+
 Response::Response(QByteArray &_ba):version(0),status(0), data(nullptr), contentLength(0), dataLength(0),packetFull(false){
     QString input = QString(_ba);
     QStringList tmpList = input.split("\r\n\r\n", Qt::SkipEmptyParts);
@@ -76,7 +78,7 @@ ScanState::ScanState(QByteArray &_ba):Response(_ba){
             inProgress = s == "yes";
         }
         if(-1 != QRegExp("Complete-Frames*").indexIn(el))
-            sscanf_s(el.toStdString().c_str(), "Complete-Frames: %d", &completeFrames);
+            sscanf_s(el.toStdString().c_str(), "Complete-Frames: %u", &completeFrames);
     }
     qDebug() << inProgress << completeFrames;
 }
@@ -86,7 +88,7 @@ ScanState::~ScanState(){}
 bool ScanState::getInProgress() const{return inProgress;}
 quint32 ScanState::getCompleteFrames() const{return completeFrames;}
 
-ScanData::ScanData(QByteArray &_ba):Response(_ba),sizeX(80),sizeZ(32),bytesPerPixel(2){
+ScanData::ScanData(QByteArray &_ba):Response(_ba),sizeX(8*nADC),sizeZ(32),bytesPerPixel(2){
     framesCount = contentLength/ (2* sizeX * sizeZ + 32); //по умолчанию, если не известно реальное количество фреймов
     for(const auto &el : preambleList){
         if(-1 != el.indexOf("Bytes-Per-Pixel:"))
@@ -113,49 +115,46 @@ quint8 ScanData::getBytesPerPixel() const{
 quint16 ScanData::getSizeX() const { return sizeX;}
 quint16 ScanData::getSizeZ() const {return sizeZ;}
 
-quint16 ScanData::getFramesCount() const{return framesCount;}
+quint32 ScanData::getFramesCount() const{return framesCount;}
 
 
 
-Frame::Frame(ScanData *sd, quint16 frameNo):fp(FrameSINGL){
+Frame::Frame(ScanData *sd, quint32 frameNo):fp(FrameSINGL){
     bpp = sd->getBytesPerPixel(), sizeX = sd->getSizeX(), sizeZ = sd->getSizeZ();
     quint32 step = bpp * sizeX * sizeZ + 32;
     header = *reinterpret_cast<FrameHeader*>(sd->getData() + frameNo * step);
-    data = new float[sizeX * sizeZ];
     for(auto i = 0; i < sizeX * sizeZ; ++i)
         data[i] = *reinterpret_cast<quint16*>(sd->getData() + frameNo * step + 32 + i * bpp);
     // bpp = sd->getBytesPerPixel();
 }
 
 Frame::Frame(QVector<Frame>::iterator start, QVector<Frame>::iterator stop, FramePurpose purpose, Frame* mean, quint16 _sX, quint16 _sZ):bpp(2),sizeX(_sX),sizeZ(_sZ),fp(purpose){
-    data = new float[sizeX * sizeZ];
+    quint32 nFrames = stop - start;
     if(purpose == FrameMEAN || purpose == FrameDARK){
         for(auto k = 0; k < sizeX * sizeZ; k++){
-            float mnVal = 0;
+            double mnVal = 0;
             for(auto i = start; i != stop; ++i){
                 mnVal += (*i)(k / sizeX, k % sizeX);
             }
-            data[k] = mnVal / (stop - start);
+            data[k] = mnVal / nFrames;
         }
     }
-
-    if(purpose == FrameSTDEV){
-        Frame* mn = mean;
+    if(purpose == FrameSTDEV && nFrames>1) {
+        Frame *mn = mean;
         if(!mn) mn = new Frame(start, stop, FrameMEAN);
         for(auto k = 0; k < sizeX * sizeZ; k++){
-            float stdVal = 0;
+            double stdVal = 0;
             for(auto i = start; i != stop; ++i){
                 stdVal += std::pow((*i)(k / sizeX, k % sizeX) - (*mn)(k / sizeX, k % sizeX), 2);
             }
-            data[k] = std::sqrt(stdVal / (stop - start - 1));
+            data[k] = std::sqrt(stdVal / (nFrames - 1));
         }
         if(mn && (mn != mean)) delete mn;
     }
 }
 
 Frame::Frame(FramePurpose purpose, QString fileName, quint16 _sX, quint16 _sZ):bpp(2),sizeX(_sX),sizeZ(_sZ),fp(purpose){
-    size_t sz = sizeX * sizeZ;
-    data = new float[sz];
+    quint32 sz = sizeX * sizeZ;
     if(QFile::exists(fileName)){
         QFile input(fileName);
         input.open(QIODevice::ReadOnly);
@@ -173,18 +172,16 @@ Frame::Frame(FramePurpose purpose, QString fileName, quint16 _sX, quint16 _sZ):b
 }
 
 Frame::Frame(const Frame &fr):header(fr.header),bpp(fr.bpp),sizeX(fr.sizeX),sizeZ(fr.sizeZ),fp(fr.fp),_max(fr._max),_min(fr._min),_mean(fr._mean){
-    data = new float[fr.sizeX * fr.sizeZ];
     memcpy(data, fr.data, fr.sizeX * fr.sizeZ * sizeof(float));
 }
 
-Frame::~Frame(){
-
-}
+Frame::~Frame(){}
 
 
-bool Frame::writeToFile(QString fileName){
+bool Frame::writeToFile(QString fileName, bool withHeader){
     QFile output(fileName);
     output.open(QIODevice::WriteOnly);
+    if(withHeader) output.write(reinterpret_cast<char*>(&header), sizeof(header));
     quint64 res = output.write(reinterpret_cast<char*>(data), sizeX * sizeZ * sizeof(float));
     output.close();
     return res != -1;
@@ -225,15 +222,14 @@ void Frame::show(){
             qDebug() << (*this)(z, x);
 }
 
-QString makeCommand(quint16 commandPipeline, Ranges *ranges, quint32 *scanRate, quint32 *readNum){
+QString makeCommand(quint16 commandPipeline, QString ranges, QString scanRate, QString readNum){
     QStringList retValue;
     for(auto i = 0; i < COMMANDS.size(); ++i){
-        QString temp = COMMANDS[i];
-        if((1 << i) == Command::ADCrange && ranges)
-            for(auto k = 0; k < 10; ++k) temp += " " + QString::number(ranges->values[k]);
-        if((1 << i) == Command::Scanrate && scanRate)  temp += " " + QString::number(*scanRate);
-        if((1 << i) == Command::ReadStream && readNum) temp += " " + QString::number(*readNum);
-        if(commandPipeline & (1 << i)) retValue.append(temp);
+        QString st = COMMANDS[i];
+        if((1 << i) == Command::ADCrange && ranges.size()) for(auto c:ranges) st.append(" ").append(c);
+        if((1 << i) == Command::Scanrate && scanRate.size())  st += " " + scanRate;
+        if((1 << i) == Command::ReadStream && readNum.size()) st += " " + readNum;
+        if(commandPipeline & (1 << i)) retValue.append(st);
     }
     return retValue.join(";");
 }
@@ -243,9 +239,7 @@ Run::Run(QByteArray &_ba):Response(_ba){
 }
 Run::~Run(){}
 
-RunContent::RunContent(Run * rc):scanRate(0XFFFFFFFF){
-    for(auto i = 0; i < 10; ++i)
-        this->rngs.values[i] = ADC_RANGE_NULL;
+RunContent::RunContent(Run * rc):scanRate(0XFFFF){
     if(rc) this->update(rc);
 }
 
@@ -285,7 +279,8 @@ void RunContent::update(Run *r){
         }
         if(-1 != el.indexOf("ADC temp")){
             maskUpdated |= Command::Temperature;
-            sscanf_s(el.toStdString().c_str(), "ADC temp = %fC", &ADCtemperature);
+            auto T = el.remove("ADC temp = ").split(' ',Qt::SkipEmptyParts);
+            for (int i=0, n=qMin(int(nADCmax), T.size()); i<n; ++i) ADCtemperatures[i] = T[i].toFloat();
         }
         if(-1 != el.indexOf("bit file compilation")){
             maskUpdated |= Command::CompileTime;
@@ -297,7 +292,7 @@ void RunContent::update(Run *r){
         if(-1 != el.indexOf("Send STATUS")) maskUpdated |= Command::Status;
         if(-1 != el.indexOf("Set ADC range")){
             maskUpdated |= Command::ADCrange;
-            for(auto i = 0; i < 10; ++i) rngs.values[i] = static_cast<ADCrange>(list[idxOfThisEl + i + 1].right(1).toUInt());
+            for(auto i = 0; i < nADC; ++i) ADCranges[i] = list[idxOfThisEl + i + 1].right(1).toUInt();
         }
         if(-1 != el.indexOf("Set scan rate")){
             maskUpdated |= Command::Scanrate;
@@ -320,9 +315,9 @@ void RunContent::update(Run *r){
             if(-1 != list[idxOfThisEl + 1].indexOf("ERROR")){
                 if(list[idxOfThisEl + 1] == "ERROR: Break read Reg 0x101 loop after 100 times read zero") readerrCode = 1;
                 else readerrCode = 2;
-            }else if(-1 != list[idxOfThisEl + 1].indexOf("DATA FIFO read")){
+            }else if(-1 != list[idxOfThisEl + 2].indexOf("DATA FIFO read")){
                 int tmp;
-                sscanf_s(list[idxOfThisEl + 1].toStdString().c_str(), "DATA FIFO read %u times, all %u frames collected", &tmp, &framesCollected);
+                sscanf_s(list[idxOfThisEl + 2].toStdString().c_str(), "DATA FIFO read %u times, all %u frames collected", &tmp, &framesCollected);
                 readerrCode = 0;
             }
         }

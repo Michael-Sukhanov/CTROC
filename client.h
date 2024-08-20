@@ -27,9 +27,9 @@ public:
 public slots:
     void getMetaInfo   ();
     void getScanState  ();
-    void getScanData   (quint16, quint16, quint16);
+    void getScanData   (size_t, size_t, size_t);
     void getLastScan   ();
-    void sendRunCommand(quint16 mask, Ranges *ranges = nullptr, quint32 *scanRate = nullptr, quint32 *readNum = nullptr);
+    void sendRunCommand(quint16 mask, QString ranges, QString scanRate, QString readNum);
 
 signals:
     void metaInfoReady   (MetaInfo*  );

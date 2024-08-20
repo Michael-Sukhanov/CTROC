@@ -39,7 +39,7 @@ void Client::getScanState()
     }
 }
 
-void Client::getScanData(quint16 ln, quint16 ff, quint16 fc){
+void Client::getScanData(size_t ln, size_t ff, size_t fc){
     delete dataResponse;
     dataResponse = nullptr;
     try{
@@ -63,7 +63,7 @@ void Client::getLastScan(){
     }
 }
 
-void Client::sendRunCommand(quint16 mask, Ranges *ranges, quint32* scanRate, quint32* readNum){
+void Client::sendRunCommand(quint16 mask, QString ranges, QString scanRate, QString readNum){
     delete runResponse;
     runResponse = nullptr;
     try{

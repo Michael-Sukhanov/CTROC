@@ -9,63 +9,47 @@
 #include <QFile>
 
 namespace Command{
-const quint16 bitNo_Status      =  0, Status      = (1 << bitNo_Status     ),
-              bitNo_CompileTime =  1, CompileTime = (1 << bitNo_CompileTime),
-              bitNo_Nlines      =  2, Nlines      = (1 << bitNo_Nlines     ),
-              bitNo_ADCrange    =  3, ADCrange    = (1 << bitNo_ADCrange   ),
-              bitNo_Scanrate    =  4, Scanrate    = (1 << bitNo_Scanrate   ),
-              bitNo_mux_adc     =  5, mux_adc     = (1 << bitNo_mux_adc    ),
-              bitNo_ScanMode    =  6, ScanMode    = (1 << bitNo_ScanMode   ),
-              bitNo_kadr_off    =  7, kadr_off    = (1 << bitNo_kadr_off   ),
-              bitNo_Reset       =  8, Reset       = (1 << bitNo_Reset      ),
-              bitNo_Drift       =  9, Drift       = (1 << bitNo_Drift      ),
-              bitNo_Offset      = 10, Offset      = (1 << bitNo_Offset     ),
-              bitNo_kadr_on     = 11, kadr_on     = (1 << bitNo_kadr_on    ),
-              bitNo_ReadStream  = 12, ReadStream  = (1 << bitNo_ReadStream ),
-              bitNo_Temperature = 13, Temperature = (1 << bitNo_Temperature),
-              bitNo_RemainWords = 14, RemainWords = (1 << bitNo_RemainWords),
-              bitNo_EndMessage  = 15, EndMessage  = (1 << bitNo_EndMessage );
+const quint16   bitNo_Status      =  0, Status      = (1 << bitNo_Status     ),
+                bitNo_CompileTime =  1, CompileTime = (1 << bitNo_CompileTime),
+                bitNo_Nlines      =  2, Nlines      = (1 << bitNo_Nlines     ),
+                bitNo_ADCrange    =  3, ADCrange    = (1 << bitNo_ADCrange   ),
+                bitNo_Scanrate    =  4, Scanrate    = (1 << bitNo_Scanrate   ),
+                bitNo_mux_adc     =  5, mux_adc     = (1 << bitNo_mux_adc    ),
+                bitNo_ScanMode    =  6, ScanMode    = (1 << bitNo_ScanMode   ),
+                bitNo_kadr_off    =  7, kadr_off    = (1 << bitNo_kadr_off   ),
+                bitNo_EndMessage  =  8, EndMessage  = (1 << bitNo_EndMessage ),
+                bitNo_Reset       =  9, Reset       = (1 << bitNo_Reset      ),
+                bitNo_Offset      = 10, Offset      = (1 << bitNo_Offset     ),
+                bitNo_Drift       = 11, Drift       = (1 << bitNo_Drift      ),
+                bitNo_kadr_on     = 12, kadr_on     = (1 << bitNo_kadr_on    ),
+                bitNo_ReadStream  = 13, ReadStream  = (1 << bitNo_ReadStream ),
+                bitNo_Temperature = 14, Temperature = (1 << bitNo_Temperature),
+                bitNo_RemainWords = 15, RemainWords = (1 << bitNo_RemainWords);
 };
 
 const QStringList COMMANDS ={
-    "status",       //0
-    "comptime",     //1
-    "nlines",       //2
-    "adc_range",    //3
-    "scanrate",     //4
-    "mux_adc",      //5
-    "scan_mode",    //6
-    "kadr_off",     //7
-    "reset",        //8
-    "drift",        //9
-    "offset",       //10
-    "kadr_on",      //11
-    "read_stream",  //12
-    "temp",         //13
-    "words_after",  //14
-    "msg_after"     //15
+    "status"        ,// 0
+    "comptime"      ,// 1
+    "nlines"        ,// 2
+    "adc_range"     ,// 3
+    "scanrate"      ,// 4
+    "mux_adc"       ,// 5
+    "scan_mode"     ,// 6
+    "kadr_off"      ,// 7
+    "msg_after"     ,// 8
+    "reset"         ,// 9
+    "offset"        ,//10
+    "drift"         ,//11
+    "kadr_on"       ,//12
+    "read_stream"   ,//13
+    "temp"          ,//14
+    "words_after"    //15
 };
 
-enum ADCrange{
-    ADC_RANGE_100pC  = 0,
-    ADC_RANGE_50pC   = 1,
-    ADC_RANGE_25pC   = 2,
-    ADC_RANGE_12_5pC = 3,
-    ADC_RANGE_6_25pC = 4,
-    ADC_RANGE_150pC  = 5,
-    ADC_RANGE_75pC   = 6,
-    ADC_RANGE_37_5pC = 7,
-    ADC_RANGE_NULL   = 8
-};
+const int nADCmax = 112;
+extern quint8 nADC;
 
-struct Ranges
-{
-    ADCrange values[10];
-};
-
-
-
-QString makeCommand(quint16 commandPipeline, Ranges *ranges = nullptr, quint32* scanRate = nullptr, quint32* readNum = nullptr);
+QString makeCommand(quint16 commandPipeline, QString ranges, QString scanRate, QString readNum);
 
 class Response{
 public:
@@ -131,7 +115,7 @@ public:
     quint8  getBytesPerPixel() const;
     quint16 getSizeX()         const;
     quint16 getSizeZ()         const;
-    quint16 getFramesCount()   const;
+    quint32 getFramesCount()   const;
 
 private:
     bool compression;
@@ -179,15 +163,15 @@ enum FramePurpose{
 
 struct Frame{
     FrameHeader header;
-    float *data;
+    float data[nADCmax*8*32] = {0.};
     quint8 bpp;
     quint16 sizeX, sizeZ;
     FramePurpose fp;
     float _max = -1, _min = -1, _mean = -1;
 
-    Frame(ScanData* sd, quint16 frameNo);
-    Frame(QVector<Frame>::iterator start, QVector<Frame>::iterator stop, FramePurpose purpose = FrameMEAN, Frame* mean = nullptr, quint16 _sX = 80, quint16 _sZ = 32);
-    Frame(FramePurpose purpose = FrameDARK, QString fileName = "", quint16 _sX = 80, quint16 _sZ = 32);
+    Frame(ScanData* sd, quint32 frameNo);
+    Frame(QVector<Frame>::iterator start, QVector<Frame>::iterator stop, FramePurpose purpose = FrameMEAN, Frame* mean = nullptr, quint16 _sX = 8*nADC, quint16 _sZ = 32);
+    Frame(FramePurpose purpose = FrameDARK, QString fileName = "", quint16 _sX = 8*nADC, quint16 _sZ = 32);
     Frame(const Frame &fr);
 
     float& operator()(int z, int x){
@@ -196,7 +180,7 @@ struct Frame{
 
     ~Frame();
 
-    bool writeToFile(QString fileName);
+    bool writeToFile(QString fileName, bool withHeader = false);
     float max();
     float min();
     float mean();
@@ -206,15 +190,14 @@ struct Frame{
 
 
 struct RunContent{
-    float ADCtemperature;
+    float ADCtemperatures[nADCmax];
     quint32 FIFOpayload, MSGpayload, tryReadNFrames, ipbusReads, framesCollected;
     int driftCorrection, offsetCorrection, readerrCode;
     bool scanMode, resetSuccessful;
     int numLines;
     QDateTime compilationDateTime;
-    Ranges rngs;
-    quint32 scanRate;
-
+    quint8 ADCranges[nADCmax] = {0};
+    quint16 scanRate;
     quint16 maskUpdated;
 
     RunContent(Run *rc = nullptr);

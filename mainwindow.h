@@ -8,11 +8,12 @@
 #include <QSettings>
 
 QCPColorGradient getGradient(const QList<QColor> &palette);
+extern quint8 nADC;
+const quint32 nFramesDefault = 1024;
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
-
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -37,8 +38,9 @@ private:
     Frame *meanFrame, *stdevFrame, *darkFrame, *lightFrame;
     QString darkCalibFileName, lightCalibFileName;
 
-    int currentframeIndex;
+    quint32 currentframeIndex;
     float sampleMin, sampleMax;
+
 
     bool darkFrameFlag, lightFrameFlag;
     RunContent runContent;
@@ -64,18 +66,21 @@ private:
 private slots:
     void updateMap(Frame &, QCustomPlot *&plot, QCPColorMap* &cmap, float* sampMin = nullptr, float* sampMax = nullptr);
     void initMap(QCustomPlot *&plot, QCPColorMap* &cmap, QCPColorScale* &cscale, QString title = "Title");
+    void updateHisto(Frame &fr, QCustomPlot *&plot, QCPBars *&bars);
 
     void getMetaInfo (MetaInfo  *);
     void getScanState(ScanState *);
     void getScanData (ScanData  *);
     void getRunResponse(Run     *);
-    void writeToFile (QVector<Frame> &vec);
+    void writeToFile (QVector<Frame> &vec, QString fname = "pixel_by_pixel.dat");
     void writeToFile (ScanData  *, QString fileName = "scan");
     void sendRunCommand();
     void saveImage(QCPAbstractPlottable *  plottable, int  dataIndex, QMouseEvent* evnt);
 
     void selectedFrameChanged();
     quint16 getUIcommandMask();
+
+    //void mySlot(QCPRange newRange,QCPRange oldRange);
 
 };
 #endif // MAINWINDOW_H
