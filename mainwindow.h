@@ -11,6 +11,10 @@ QCPColorGradient getGradient(const QList<QColor> &palette);
 extern quint8 nADC;
 const quint32 nFramesDefault = 1024;
 
+enum Range_Mode{
+    RANGE_SINGLE_FRAME, RANGE_SAMPLING_FRAME
+};
+
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
@@ -22,11 +26,15 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
+signals:
+    void scanDataLoaded(ScanData*);
+
 private:
     Ui::MainWindow *ui;
     QCPColorMap *colorMap, *colorMapMean, *colorMapStd;
     QCPColorScale *colorScale, *colorScaleMean, *colorScaleStd;
     QCPBars *meanBars, *stdBars;
+    Range_Mode rMode;
 
     QString peerIP;
     quint16 peerPort;
@@ -35,14 +43,11 @@ private:
     QLineEdit *ADCRangeLE, *setRateLE, *readStreamLE;
 
     QVector<Frame> frames;
-    Frame *meanFrame, *stdevFrame, *darkFrame, *lightFrame;
+    Frame meanFrame, stdevFrame, darkFrame, lightFrame;
     QString darkCalibFileName, lightCalibFileName;
 
     quint32 currentframeIndex;
-    float sampleMin, sampleMax;
 
-
-    bool darkFrameFlag, lightFrameFlag;
     RunContent runContent;
 
     void getRawFrames(ScanData *response, QVector<Frame> &);
@@ -58,13 +63,25 @@ private:
     void loadSettings();
     void saveSettings();
 
-    QMessageBox msgBox;
+    QMessageBox msgBox;  
 
     //Получаем имя калибровочного файла на основе полученных в run content данных
     QString getCalibrationFileName(FramePurpose fp);
 
+    //используется для отображения, сохранения и загрузки данных с последнего скана
+    ScanData *lastScanData;
+
+    //функция получения калибровочных фреймов
+    Frame getDarkFrame(ScanData*);
+    Frame getLighFrame(ScanData*);
+
+    void updateDarkCalib(QString fileName);
+    void updateLightCalib(QString fileName);
+
+    QCPRange getMapRange(QVector<Frame>::iterator start, QVector<Frame>::iterator stop);
+
 private slots:
-    void updateMap(Frame &, QCustomPlot *&plot, QCPColorMap* &cmap, float* sampMin = nullptr, float* sampMax = nullptr);
+    void updateMap(Frame &, QCustomPlot *&plot, QCPColorMap* &cmap);
     void initMap(QCustomPlot *&plot, QCPColorMap* &cmap, QCPColorScale* &cscale, QString title = "Title");
     void updateHisto(Frame &fr, QCustomPlot *&plot, QCPBars *&bars);
 

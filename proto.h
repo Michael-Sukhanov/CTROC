@@ -6,6 +6,7 @@
 #include <QString>
 #include <QStringList>
 #include <iostream>
+#include <fstream>
 #include <QFile>
 
 namespace Command{
@@ -54,14 +55,17 @@ QString makeCommand(quint16 commandPipeline, QString ranges, QString scanRate, Q
 class Response{
 public:
     Response(QByteArray &_ba);
+    Response(QString fileName);
     ~Response();
 
-    float getVersion() const;
+    float   getVersion() const;
     quint16 getStatus() const;
-    char *getData() const;
+    char *  getData() const;
     quint32 getContentLength() const;
-    void appendData(QByteArray &_ba);
-    void showData();
+    void    appendData(QByteArray &_ba);
+    void    showData();
+
+    void   storePacket(QString fname = "packet.dat");
 
     bool isPacketFull() const;
     bool isPacketValid() const;
@@ -76,6 +80,8 @@ protected:
 
 private:
     quint32 fragmentCounter{0};
+    //the fragment to use in other constructors;
+    void _Response(QByteArray &_ba);
 
 };
 
@@ -110,6 +116,7 @@ class ScanData : public Response{
 
 public:
     ScanData(QByteArray &_ba);
+    ScanData(QString fileName);
     ~ScanData();
 
     quint8  getBytesPerPixel() const;
@@ -126,6 +133,8 @@ private:
     quint32 firstFrame;
     quint32 bytesPerPixel;
     quint32 framesCount;
+
+    void _ScanData();
 };
 
 class Run : public Response{
@@ -168,6 +177,7 @@ struct Frame{
     quint16 sizeX, sizeZ;
     FramePurpose fp;
     float _max = -1, _min = -1, _mean = -1;
+    bool empty;
 
     Frame(ScanData* sd, quint32 frameNo);
     Frame(QVector<Frame>::iterator start, QVector<Frame>::iterator stop, FramePurpose purpose = FrameMEAN, Frame* mean = nullptr, quint16 _sX = 8*nADC, quint16 _sZ = 32);
@@ -177,7 +187,19 @@ struct Frame{
     float& operator()(int z, int x){
         return data[x + z * sizeX];
     }
-
+    Frame& operator=(const Frame &other){
+        header = other.header;
+        memcpy(data, other.data, other.sizeX * other.sizeZ * sizeof(float));
+        bpp = other.bpp;
+        sizeX = other.sizeX;
+        sizeZ = other.sizeZ;
+        fp = other.fp;
+        _max = other._max;
+        _min = other._min;
+        _mean = other._mean;
+        empty = other.empty;
+        return *this;
+    }
     ~Frame();
 
     bool writeToFile(QString fileName, bool withHeader = false);

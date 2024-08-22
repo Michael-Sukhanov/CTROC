@@ -8,10 +8,9 @@ static const QVector<float> //  0  1  2    3    4   5  6    7
     ADCrangeValues_pC        {100,50,25,12.5,6.25,150,75,37.5};
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent), ui(new Ui::MainWindow),
-    meanFrame(nullptr), stdevFrame(nullptr), darkFrame(nullptr), lightFrame(nullptr),
-    darkCalibFileName(""), lightCalibFileName(""),
-    darkFrameFlag(false), lightFrameFlag(false)
+    : QMainWindow(parent), ui(new Ui::MainWindow), rMode(RANGE_SAMPLING_FRAME),
+     darkCalibFileName(""), lightCalibFileName(""),
+    lastScanData(nullptr)
 {
     ui->setupUi(this);
 
@@ -38,16 +37,6 @@ MainWindow::MainWindow(QWidget *parent)
     });
     connect(ui->pushButton_gls             , &QPushButton::clicked, Tcpclient, &Client::getLastScan);
     connect(ui->pushButton_run             , &QPushButton::clicked, this, &MainWindow::sendRunCommand);
-    connect(ui->pushButton_darkCalib, &QPushButton::clicked, this, [=](){
-        ui->textEdit_messages->append("Performing Dark field calibration");
-        darkFrameFlag = true;
-        Tcpclient->sendRunCommand(Command::ReadStream, "", "", "1024");
-    });
-    connect(ui->pushButton_lightCalib, &QPushButton::clicked, this, [=](){
-        ui->textEdit_messages->append("Performing Light field calibration");
-        lightFrameFlag = true;
-        Tcpclient->sendRunCommand(Command::ReadStream, "", "", "1024");
-    });
 
 
     //Обработка ответов от клиентов
@@ -56,11 +45,17 @@ MainWindow::MainWindow(QWidget *parent)
     connect(Tcpclient, &Client::scanDataReady   , this, &MainWindow::getScanData   );
     connect(Tcpclient, &Client::runResponseReady, this, &MainWindow::getRunResponse);
 
+    connect(this, &MainWindow::scanDataLoaded, this, &MainWindow::getScanData);
+
     //элементы визуализации (переключение между фреймами)
     connect(ui->pushButton_prevFrame, &QPushButton::clicked, this, &MainWindow::selectedFrameChanged);
     connect(ui->pushButton_nextFrame, &QPushButton::clicked, this, &MainWindow::selectedFrameChanged);
-
     connect(ui->horizontalSlider    , &QSlider::valueChanged, this, &MainWindow::selectedFrameChanged);
+    connect(ui->pushButton_rangeMode, &QPushButton::clicked, this, [=, this](bool checked){
+        rMode = checked ? RANGE_SAMPLING_FRAME : RANGE_SINGLE_FRAME;
+        updateMap(frames[currentframeIndex], ui->plotMap, colorMap);
+        ui->pushButton_rangeMode->setText(checked ? "Samples" : "Single");
+    });
 
     //обработка поведения lineEditов
     //ui->lineEdit->setValidator (new QRegExpValidator(QRegExp("^([1-9][0-9]{0,2}|1000)$")));
@@ -97,9 +92,12 @@ MainWindow::MainWindow(QWidget *parent)
         });
     }
 
+    connect(ui->pushButton_disDark,  &QPushButton::clicked, this, [=, this]{ui->pushButton_disDark ->setVisible(false); darkFrame  = Frame(FrameDARK);  ui->label_Dark ->setText("Disabled"); getScanData(lastScanData);});
+    connect(ui->pushButton_disLight, &QPushButton::clicked, this, [=, this]{ui->pushButton_disLight->setVisible(false); lightFrame = Frame(FrameLIGHT); ui->label_Light->setText("Disabled"); getScanData(lastScanData);});
+
     //обработка поведения check-boxов
     QList<QCheckBox*> checkBoxes = this->findChildren<QCheckBox*>(QRegularExpression("checkBox_*"));
-    for(auto &el : checkBoxes) connect(el, &QCheckBox::clicked, this, [=](){ui->pushButton_run->setEnabled(getUIcommandMask());});
+    for(auto &el : checkBoxes) connect(el, &QCheckBox::clicked, this, [=, this](){ui->pushButton_run->setEnabled(getUIcommandMask());});
 
     initMap(ui->plotMap,      colorMap,     colorScale    );
     initMap(ui->plotMapMean,  colorMapMean, colorScaleMean, "Mean map" );
@@ -120,44 +118,52 @@ MainWindow::MainWindow(QWidget *parent)
     ui->histMean ->axisRect()->setRangeDrag(Qt::Horizontal);
     ui->histMean ->axisRect()->setRangeZoom(Qt::Horizontal);
 
+    //menuBar для сохранения и загрузки пакетов и калибровок
+    QMenu* fileMenu = menuBar()->addMenu(tr("&File"));
+
+    connect(fileMenu->addAction("Store data ..."), &QAction::triggered, this, [=, this](bool trig){
+        QString fileName = QFileDialog::getSaveFileName(this, tr("Store Data"), "Data_" + QDateTime::currentDateTime().toString("yyMMddHHmmss"), tr("*.dat"));
+        if(fileName.isEmpty()) return;
+        if(lastScanData) lastScanData->storePacket(fileName);
+    });
+    connect(fileMenu->addAction("Load data ..."), &QAction::triggered, this, [=, this](bool trig){
+        QString fileName = QFileDialog::getOpenFileName(this, tr("Open file"), "", tr("*.dat"));
+        if(fileName.isEmpty()) return;
+        if(lastScanData) delete lastScanData;
+        lastScanData = new ScanData(fileName);
+        if(lastScanData->isPacketValid()) emit scanDataLoaded(lastScanData);
+        else ui->textEdit_messages->append("Unable to show data");
+    });
+    fileMenu->addSeparator();
+    connect(fileMenu->addAction("Load and apply Dark ..."), &QAction::triggered, this, [=, this]{
+        QString fileName = QFileDialog::getOpenFileName(this, tr("Select dark data to calib"), "", tr("*.dat"));
+        updateDarkCalib(fileName);
+    });
+    connect(fileMenu->addAction("Load and apply Light ..."), &QAction::triggered, this, [=, this]{
+        QString fileName = QFileDialog::getOpenFileName(this, tr("Select dark data to calib"), "", tr("*.dat"));
+        updateLightCalib(fileName);
+    });
+
+    connect(fileMenu, &QMenu::aboutToShow, this, [=, this](){fileMenu->actions()[0]->setEnabled(lastScanData);});
+    connect(fileMenu, &QMenu::aboutToShow, this, [=, this](){fileMenu->actions()[4]->setEnabled(!darkFrame.empty);});
+
+
+    //установка калибровочных фреймов по умолчанию
     msgBox.setIcon(QMessageBox::Information);
-    if(QFile::exists(darkCalibFileName)) darkFrame  = new Frame(FrameDARK , darkCalibFileName);
-    else {
+    if(QFile::exists(darkCalibFileName)) updateDarkCalib(darkCalibFileName);
+    else{
         msgBox.setText("Файл калибровки темнового поля " + darkCalibFileName + " не найден");
         msgBox.exec();
-        darkFrame  = new Frame(FrameDARK );
-        darkCalibFileName = "";
+        darkFrame  = Frame(FrameDARK);
     }
-    ui->label_Dark->setText(darkCalibFileName.isEmpty() ? "No calibration" : darkCalibFileName);
 
-    if(QFile::exists(lightCalibFileName)) lightFrame = new Frame(FrameLIGHT, lightCalibFileName, 8*nADC, 32);
+    if(QFile::exists(lightCalibFileName)) updateLightCalib(lightCalibFileName);
     else{
         msgBox.setText("Файл калибровки светового поля " + lightCalibFileName + " не найден");
         msgBox.exec();
-        lightFrame = new Frame(FrameLIGHT);
-        lightCalibFileName = "";
+        lightFrame = Frame(FrameLIGHT);
     }
-    ui->label_Light->setText(lightCalibFileName.isEmpty() ? "No calibration" : lightCalibFileName);
 
-    connect(ui->pushButton_loadLight, &QPushButton::clicked, this, [=](){
-        QString fn = QFileDialog::getOpenFileName(this, tr("Select calibration file"), QDir::currentPath(), tr("*.dat"));
-        if(!fn.isEmpty()) lightCalibFileName = QDir().relativeFilePath(fn);
-        else return;
-        if(lightFrame) delete lightFrame;
-        lightFrame = new Frame(FrameLIGHT, lightCalibFileName);
-        ui->label_Light->setText(lightCalibFileName);
-    });
-
-    connect(ui->pushButton_loadDark, &QPushButton::clicked, this, [=](){
-        QString fn = QFileDialog::getOpenFileName(this, tr("Select calibration file"), QDir::currentPath(), tr("*.dat"));
-        if(!fn.isEmpty()) darkCalibFileName = QDir().relativeFilePath(fn);
-        else return;
-        if(darkFrame) delete darkFrame;
-        darkFrame = new Frame(FrameDARK, darkCalibFileName);
-        ui->label_Dark->setText(darkCalibFileName);
-    });
-
-//    connect(ui->histMean->xAxis, SIGNAL(rangeChanged(QCPRange, QCPRange)), this, SLOT(mySlot(QCPRange, QCPRange)));
 }
 
 MainWindow::~MainWindow(){
@@ -167,7 +173,6 @@ MainWindow::~MainWindow(){
 
 void MainWindow::getRawFrames(ScanData *response, QVector<Frame> &vec){
     vec.clear();
-    qDebug() << response->getFramesCount();
     frames.reserve(response->getFramesCount());
     for(auto i = 0; i < response->getFramesCount(); ++i){
         vec.append(Frame(response, i));
@@ -184,11 +189,8 @@ void MainWindow::runGUIControl(bool enabled){
 void MainWindow::correctFrames(QVector<Frame>::iterator start, QVector<Frame>::iterator stop){
     for(auto it = start; it != stop; ++it){
         for(auto z = 0; z < it->sizeZ; ++z)
-            for(auto x = 0; x < it->sizeX; ++x){
+            for(auto x = 0; x < it->sizeX; ++x) (*it)(z, x) = ((*it)(z, x) - darkFrame(z, x)) / lightFrame(z, x);
 
-                (*it)(z, x) = ((*it)(z, x) - (*darkFrame)(z, x)) / (*lightFrame)(z, x);
-
-            }
     }
 }
 
@@ -200,21 +202,18 @@ quint8 MainWindow::getCorrespondingBitNo(QWidget *wgt){
     return wgt->objectName().split("_", Qt::SkipEmptyParts).last().toUInt();
 }
 
-
-void MainWindow::updateMap(Frame &fr, QCustomPlot *&plot, QCPColorMap *&cmap, float* sampMin, float* sampMax){
+void MainWindow::updateMap(Frame &fr, QCustomPlot *&plot, QCPColorMap *&cmap){
     cmap->data()->setSize(fr.sizeZ, fr.sizeX);
     cmap->data()->setRange(QCPRange(0.5,fr.sizeZ - 0.5), QCPRange(0.5, fr.sizeX - 0.5));
 
-        for(auto i = 0; i < fr.sizeZ; ++i)
-            for(auto k = 0; k < fr.sizeX; ++k)
-                cmap->data()->setCell(i, k, fr(i, k));
-
-    cmap->setDataRange(QCPRange(sampMin ? *sampMin : fr.min(), sampMax ? *sampMax : fr.max()));
+    for(auto i = 0; i < fr.sizeZ; ++i)
+        for(auto k = 0; k < fr.sizeX; ++k)
+            cmap->data()->setCell(i, k, fr(i, k));
+    cmap->setDataRange(rMode == RANGE_SAMPLING_FRAME && plot == ui->plotMap ? getMapRange(frames.begin(), frames.end()) : QCPRange(fr.min(), fr.max()));
     plot->xAxis->setRange(QCPRange(0, fr.sizeZ));
     plot->yAxis->setRange(QCPRange(0, fr.sizeX));
     plot->replot();
 }
-
 
 void MainWindow::initMap(QCustomPlot *&plot, QCPColorMap *&cmap, QCPColorScale *&cscale, QString title){
     // configure axis rect:
@@ -281,67 +280,24 @@ void MainWindow::getScanState(ScanState *resp){
 }
 
 void MainWindow::getScanData(ScanData *resp){
+
+    lastScanData = resp;
     ui->pushButton_getData->setEnabled(true);
 
-    //сбрасываем предыдущие mean и stdev фреймы
-    if(meanFrame)  delete meanFrame;
-    if(stdevFrame) delete stdevFrame;
-
-    //если проводится одна из калибровок, ее матрицу нужно очистить
-    //для темной это все нули
-    //для световой это все единицы
-    if(darkFrameFlag){
-        if(darkFrame) delete darkFrame;
-        if(lightFrame) delete lightFrame;
-        darkFrame = new Frame(FrameDARK);
-        lightFrame = new Frame(FrameLIGHT);
-    }
-
-    if(lightFrameFlag){
-        if(lightFrame) delete lightFrame;
-        lightFrame = new Frame(FrameLIGHT);
-    }
-
-    ScanData *sd = resp;
-    getRawFrames(sd, frames);
+    getRawFrames(lastScanData, frames);
     correctFrames(frames.begin(), frames.end());
 
-    if(!frames.empty()){
-        sampleMax = frames.first().max();
-        sampleMin = frames.first().min();}
-    for(auto &fr : frames){
-        if(sampleMin > fr.min()) sampleMin = fr.min();
-        if(sampleMax < fr.max()) sampleMax = fr.max();
-    }
+    meanFrame  = Frame(frames.begin(), frames.end(), FrameMEAN , nullptr, lastScanData->getSizeX(), lastScanData->getSizeZ());
+    stdevFrame = Frame(frames.begin(), frames.end(), FrameSTDEV, &meanFrame, lastScanData->getSizeX(), lastScanData->getSizeZ());
 
-    meanFrame  = new Frame(frames.begin(), frames.end(), FrameMEAN , nullptr, resp->getSizeX(), resp->getSizeZ());
-    stdevFrame = new Frame(frames.begin(), frames.end(), FrameSTDEV, meanFrame, resp->getSizeX(), resp->getSizeZ());
 
-    if(darkFrameFlag){
-        *darkFrame = *meanFrame;
-        darkCalibFileName = getCalibrationFileName(FrameDARK);
-        darkFrame->writeToFile(darkCalibFileName);
-        ui->textEdit_messages->append("Dark field calibration finished: new file " + darkCalibFileName);
-    }
+    updateMap(frames.first(), ui->plotMap,       colorMap      );
+    updateMap(meanFrame,      ui->plotMapMean,   colorMapMean  );
+    updateMap(stdevFrame,     ui->plotMapSigma,  colorMapStd   );
 
-    if(lightFrameFlag){
-        *lightFrame = *meanFrame;
-        float lightMean = lightFrame->mean();
-        for(auto i = 0; i < lightFrame->sizeX * lightFrame->sizeZ; ++i)
-            lightFrame->data[i] = lightFrame->data[i] / lightMean;
-        lightCalibFileName = getCalibrationFileName(FrameLIGHT);
-        lightFrame->writeToFile(lightCalibFileName);
-        ui->textEdit_messages->append("Light field calibration finished: new file " + lightCalibFileName);
-    }
+    updateHisto(meanFrame, ui->histMean,  meanBars);
+    updateHisto(stdevFrame, ui->histSigma, stdBars);
 
-    updateMap(frames.first(), ui->plotMap,   colorMap    , &sampleMin, &sampleMax);
-    updateMap(*meanFrame, ui->plotMapMean,   colorMapMean);
-    updateMap(*stdevFrame, ui->plotMapSigma, colorMapStd );
-
-    updateHisto(*meanFrame, ui->histMean,  meanBars);
-    updateHisto(*stdevFrame, ui->histSigma, stdBars);
-
-    // writeToFile(frames); ASCII writing to file
     currentframeIndex = 0;
     ui->pushButton_prevFrame->setEnabled(false);
     if(frames.size() > 1 ) ui->pushButton_nextFrame->setEnabled(true);
@@ -349,12 +305,6 @@ void MainWindow::getScanData(ScanData *resp){
     ui->horizontalSlider->setRange(0, frames.size() - 1);
     QString txt = QString::asprintf("Frame %u/%u", currentframeIndex + 1, frames.size());
     ui->label_frameNo->setText(txt);
-
-    // QCPTextElement *title = dynamic_cast<QCPTextElement*>(ui->plotMap->plotLayout()->element(0, 0));
-    // title->setText(txt);
-
-    darkFrameFlag = false;
-    lightFrameFlag = false;
 }
 
 void MainWindow::getRunResponse(Run *resp){
@@ -380,7 +330,6 @@ void MainWindow::getRunResponse(Run *resp){
     if(Command::ReadStream  & mask){ui->textEdit_messages->append(QString::asprintf("Trying to read %u frames", runContent.tryReadNFrames));
         if(runContent.readerrCode) ui->textEdit_messages->append( runContent.readerrCode == 1 ? "ERROR read: FIFO is empty" : "Unknown Error");
         else ui->textEdit_messages->append(QString::asprintf("%u frames collected", runContent.framesCollected));
-        if(darkFrameFlag || lightFrameFlag) Tcpclient->getLastScan();
     }
     if(Command::Temperature & mask) {
         QString st="ADCnumber:"; for(auto i = 0; i < nADC; ++i) st+=QString::asprintf("%5u"  ,                           i) ; ui->textEdit_messages->append(st);
@@ -444,8 +393,8 @@ void MainWindow::saveImage(QCPAbstractPlottable *  plottable, int  dataIndex, QM
         if(format == "png") plotObj->savePng(fileName);
         if(format == "pdf") plotObj->savePdf(fileName);
         if(format == "dat") {
-            if(plotObj == ui->plotMapMean ) meanFrame->writeToFile(fileName);
-            if(plotObj == ui->plotMapSigma) stdevFrame->writeToFile(fileName);
+            if(plotObj == ui->plotMapMean ) meanFrame.writeToFile(fileName);
+            if(plotObj == ui->plotMapSigma) stdevFrame.writeToFile(fileName);
             if(plotObj == ui->plotMap     ) writeToFile(frames);
         }
     });
@@ -459,12 +408,12 @@ void MainWindow::saveImage(QCPAbstractPlottable *  plottable, int  dataIndex, QM
 void MainWindow::selectedFrameChanged(){
     QPushButton *but = qobject_cast<QPushButton*>(sender());
     if(but == ui->pushButton_prevFrame && currentframeIndex > 0)
-        updateMap(frames[--currentframeIndex], ui->plotMap, colorMap, &sampleMin, &sampleMax);
+        updateMap(frames[--currentframeIndex], ui->plotMap, colorMap);
     else if(but == ui->pushButton_nextFrame && frames.size() - 1 > currentframeIndex)
-        updateMap(frames[++currentframeIndex], ui->plotMap, colorMap, &sampleMin, &sampleMax);
+        updateMap(frames[++currentframeIndex], ui->plotMap, colorMap);
     else if(qobject_cast<QSlider*>(sender()) == ui->horizontalSlider){
         if(ui->horizontalSlider->value() == currentframeIndex) return;
-        updateMap(frames[currentframeIndex = ui->horizontalSlider->value()], ui->plotMap, colorMap, &sampleMin, &sampleMax);
+        updateMap(frames[currentframeIndex = ui->horizontalSlider->value()], ui->plotMap, colorMap);
     }
     ui->horizontalSlider->setValue(currentframeIndex);
 
@@ -472,10 +421,6 @@ void MainWindow::selectedFrameChanged(){
     ui->pushButton_nextFrame->setEnabled(currentframeIndex != frames.size() - 1);
     QString txt = QString::asprintf("Frame %d/%d", currentframeIndex + 1, frames.size());
     ui->label_frameNo->setText(txt);
-    // qDebug() << txt;
-
-    // ui->plotMap->plotLayout()->remove(ui->plotMap->plotLayout()->element(0,0));
-    // ui->plotMap->plotLayout()->addElement(0,0,new QCPTextElement(ui->plotMap, txt));
 }
 
 quint16 MainWindow::getUIcommandMask(){
@@ -488,12 +433,6 @@ quint16 MainWindow::getUIcommandMask(){
     }
     return mask;
 }
-
-// void MainWindow::mySlot(QCPRange newRange,QCPRange oldRange){
-//     if(newRange.upper > 100 ||
-//        newRange.upper - newRange.lower < meanBars->width())
-//         ui->histMean->xAxis->setRange(oldRange);
-// }
 
 QCPColorGradient getGradient(const QList<QColor> &palette){
     QCPColorGradient retValue;
@@ -525,11 +464,47 @@ void MainWindow::saveSettings(){
     settings->sync();
 }
 
-QString MainWindow::getCalibrationFileName(FramePurpose fp){
-    QString rngs = "";
-    for(auto i = 0; i < nADC; i++) rngs += ('0' + runContent.ADCranges[i]);
+Frame MainWindow::getDarkFrame(ScanData *sd){
+    QVector<Frame> frames;
+    getRawFrames(sd, frames);
+    return Frame(frames.begin(),frames.end());
+}
 
-    return QString(fp == FrameDARK ? "Dark" : "Light") + "_" + rngs + "_" + QString::number(runContent.scanRate) + ".dat";
+Frame MainWindow::getLighFrame(ScanData *sd){
+    QVector<Frame> frames;
+    getRawFrames(sd, frames);
+    for(auto &frame : frames) for(auto i = 0; i < darkFrame.sizeX * darkFrame.sizeZ; ++i) frame.data[i] -= darkFrame.data[i];
+    Frame lightFrame = Frame(frames.begin(), frames.end());
+    for(auto i = 0; i < lightFrame.sizeX * lightFrame.sizeZ; ++i) lightFrame.data[i] /= lightFrame.mean();
+    return lightFrame;
+}
+
+void MainWindow::updateDarkCalib(QString fileName){
+    ui->pushButton_disDark->setVisible(true);
+    ui->label_Dark->setText(fileName);
+    if(fileName.isEmpty()) return;
+    ScanData* sd = new ScanData(fileName);
+    darkFrame = getDarkFrame(sd);
+    delete sd;
+}
+
+void MainWindow::updateLightCalib(QString fileName){
+    ui->pushButton_disLight->setVisible(true);
+    ui->label_Light->setText(fileName);
+    if(fileName.isEmpty()) return;
+    ScanData* sd = new ScanData(fileName);
+    lightFrame = getLighFrame(sd);
+    delete sd;
+}
+
+QCPRange MainWindow::getMapRange(QVector<Frame>::iterator start, QVector<Frame>::iterator stop){
+    float sampleMax = start->max();
+    float sampleMin = start->min();
+    for(auto it = start; it != stop; it++){
+        if(sampleMin > it->min()) sampleMin = it->min();
+        if(sampleMax < it->max()) sampleMax = it->max();
+    }
+    return QCPRange(sampleMin, sampleMax);
 }
 
 void MainWindow::loadSettings(){
