@@ -97,7 +97,7 @@ private slots:
     void saveImage(QCPAbstractPlottable *  plottable, int  dataIndex, QMouseEvent* evnt);
 
     void selectedFrameChanged();
-    void changeCorrespondingRange(QWheelEvent*);
+    void changeCorrespondingRange();
     quint16 getUIcommandMask();
 
     void disableCalibration();

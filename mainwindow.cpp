@@ -9,7 +9,7 @@ static const QVector<float> //  0  1  2    3    4   5  6    7
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow),
-    darkCalibFileName(""), lightCalibFileName(""), currentframeIndex(0),
+    darkCalibFileName(""), lightCalibFileName(""), currentframeIndex(0), rMode(RANGE_SAMPLING_FRAME),
     lastScanData(nullptr)
 {
     ui->setupUi(this);
@@ -115,8 +115,11 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->plotMapMean , &QCustomPlot::plottableClick, this, &MainWindow::saveImage);
     connect(ui->plotMapSigma, &QCustomPlot::plottableClick, this, &MainWindow::saveImage);
 
-    connect(ui->histMean , SIGNAL(mouseWheel(QWheelEvent*)), this, SLOT(changeCorrespondingRange(QWheelEvent*)));
-    connect(ui->histSigma, SIGNAL(mouseWheel(QWheelEvent*)), this, SLOT(changeCorrespondingRange(QWheelEvent*)));
+    connect(ui->histMean,  &QCustomPlot::mouseWheel,   this, [=, this](QWheelEvent *ev){changeCorrespondingRange();});
+    connect(ui->histMean,  &QCustomPlot::mouseRelease, this, [=, this](QMouseEvent *ev){changeCorrespondingRange();});
+    connect(ui->histSigma, &QCustomPlot::mouseWheel,   this, [=, this](QWheelEvent *ev){changeCorrespondingRange();});
+    connect(ui->histSigma, &QCustomPlot::mouseRelease, this, [=, this](QMouseEvent *ev){changeCorrespondingRange();});
+
 
     meanBars = new QCPBars(ui->histMean->xAxis, ui->histMean->yAxis);
     stdBars  = new QCPBars(ui->histSigma->xAxis, ui->histSigma->yAxis);
@@ -161,6 +164,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     //установка калибровочных фреймов по умолчанию
     msgBox.setIcon(QMessageBox::Information);
+    qDebug() << darkCalibFileName;
     if(QFile::exists(darkCalibFileName)) updateDarkCalib(darkCalibFileName);
     else{
         msgBox.setText("Файл калибровки темнового поля " + darkCalibFileName + " не найден");
@@ -452,8 +456,7 @@ void MainWindow::selectedFrameChanged(){
     ui->label_frameNo->setText(txt);
 }
 
-void MainWindow::changeCorrespondingRange(QWheelEvent* ev){
-    qDebug() << ev;
+void MainWindow::changeCorrespondingRange(){
     QCustomPlot* sndr = qobject_cast<QCustomPlot*>(sender());
    (sndr == ui->histMean ? colorMapMean : colorMapStd)->setDataRange(sndr->xAxis->range());
     updateMap(sndr == ui->histMean ? meanFrame : stdevFrame,
@@ -533,6 +536,7 @@ void MainWindow::updateDarkCalib(QString fileName){
     if(fileName.isEmpty()) return;
     ScanData* sd = new ScanData(fileName);
     darkFrame = getDarkFrame(sd);
+    darkCalibFileName = fileName;
     delete sd;
 }
 
@@ -542,6 +546,7 @@ void MainWindow::updateLightCalib(QString fileName){
     if(fileName.isEmpty()) return;
     ScanData* sd = new ScanData(fileName);
     lightFrame = getLighFrame(sd);
+    lightCalibFileName = fileName;
     delete sd;
 }
 
