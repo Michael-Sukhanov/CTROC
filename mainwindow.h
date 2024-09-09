@@ -78,10 +78,12 @@ private:
     void updateDarkCalib(QString fileName);
     void updateLightCalib(QString fileName);
 
-    QCPRange getMapRange(QVector<Frame>::iterator start, QVector<Frame>::iterator stop);
+    // QCPRange getMapRange(const QVector<Frame>::iterator start, const QVector<Frame>::iterator stop);
+    QCPRange getMapRange(QVector<Frame> &frames);
+    QCPRange getMapRange(Frame&);
 
 private slots:
-    void updateMap(Frame &, QCustomPlot *&plot, QCPColorMap* &cmap);
+    void updateMap(Frame &, QCustomPlot *&plot, QCPColorMap* &cmap, QCPRange range);
     void initMap(QCustomPlot *&plot, QCPColorMap* &cmap, QCPColorScale* &cscale, QString title = "Title");
     void updateHisto(Frame &fr, QCustomPlot *&plot, QCPBars *&bars);
 
@@ -95,9 +97,10 @@ private slots:
     void saveImage(QCPAbstractPlottable *  plottable, int  dataIndex, QMouseEvent* evnt);
 
     void selectedFrameChanged();
+    void changeCorrespondingRange(QWheelEvent*);
     quint16 getUIcommandMask();
 
-    //void mySlot(QCPRange newRange,QCPRange oldRange);
+    void disableCalibration();
 
 };
 #endif // MAINWINDOW_H

@@ -114,14 +114,11 @@ ScanData::ScanData(QByteArray &_ba):Response(_ba),sizeX(8*nADC),sizeZ(32),bytesP
 
 ScanData::ScanData(QString fileName):Response(fileName),sizeX(8*nADC),sizeZ(32),bytesPerPixel(2){_ScanData();}
 
-
-
 ScanData::~ScanData(){}
 
-quint8 ScanData::getBytesPerPixel() const{
-    return bytesPerPixel;}
-quint16 ScanData::getSizeX() const { return sizeX;}
-quint16 ScanData::getSizeZ() const {return sizeZ;}
+quint8  ScanData::getBytesPerPixel() const{return bytesPerPixel;}
+quint16 ScanData::getSizeX()        const {return sizeX;}
+quint16 ScanData::getSizeZ()        const {return sizeZ;}
 
 quint32 ScanData::getFramesCount() const{return framesCount;}
 
@@ -248,7 +245,7 @@ void Frame::show(){
             qDebug() << (*this)(z, x);
 }
 
-QString makeCommand(quint16 commandPipeline, QString ranges, QString scanRate, QString readNum){
+QString makeCommand(quint32 commandPipeline, QString ranges, QString scanRate, QString readNum){
     QStringList retValue;
     for(auto i = 0; i < COMMANDS.size(); ++i){
         QString st = COMMANDS[i];
@@ -318,12 +315,12 @@ void RunContent::update(Run *r){
         if(-1 != el.indexOf("Send STATUS")) maskUpdated |= Command::Status;
         if(-1 != el.indexOf("Set ADC range")){
             maskUpdated |= Command::ADCrange;
-            for(auto i = 0; i < nADC; ++i) ADCranges[i] = list[idxOfThisEl + i + 1].right(1).toUInt();
+            for(auto i = 0; i < nADC; ++i) ADCranges[i] = list[idxOfThisEl + i + 1].rightRef(1).toUInt();
         }
         if(-1 != el.indexOf("Set scan rate")){
             maskUpdated |= Command::Scanrate;
             int brackLeft = list[idxOfThisEl + 1].indexOf("(") + 1;
-            scanRate = list[idxOfThisEl + 1].mid(brackLeft, list[idxOfThisEl + 1].indexOf(")") - brackLeft).toUInt();
+            scanRate = list[idxOfThisEl + 1].midRef(brackLeft, list[idxOfThisEl + 1].indexOf(")") - brackLeft).toUInt();
         }
         if(-1 != el.indexOf("Set CONV on")) maskUpdated |= Command::ScanMode;
         if(-1 != el.indexOf("left in FIFO after ADC data read")){

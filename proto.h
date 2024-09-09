@@ -10,7 +10,7 @@
 #include <QFile>
 
 namespace Command{
-const quint16   bitNo_Status      =  0, Status      = (1 << bitNo_Status     ),
+const quint32   bitNo_Status      =  0, Status      = (1 << bitNo_Status     ),
                 bitNo_CompileTime =  1, CompileTime = (1 << bitNo_CompileTime),
                 bitNo_Nlines      =  2, Nlines      = (1 << bitNo_Nlines     ),
                 bitNo_ADCrange    =  3, ADCrange    = (1 << bitNo_ADCrange   ),
@@ -25,7 +25,9 @@ const quint16   bitNo_Status      =  0, Status      = (1 << bitNo_Status     ),
                 bitNo_kadr_on     = 12, kadr_on     = (1 << bitNo_kadr_on    ),
                 bitNo_ReadStream  = 13, ReadStream  = (1 << bitNo_ReadStream ),
                 bitNo_Temperature = 14, Temperature = (1 << bitNo_Temperature),
-                bitNo_RemainWords = 15, RemainWords = (1 << bitNo_RemainWords);
+                bitNo_RemainWords = 15, RemainWords = (1 << bitNo_RemainWords),
+                bitNo_drive_on    = 16, drive_on    = (1 << bitNo_drive_on),
+                bitNo_drive_off   = 17, drive_off   = (1 << bitNo_drive_off);
 };
 
 const QStringList COMMANDS ={
@@ -44,13 +46,15 @@ const QStringList COMMANDS ={
     "kadr_on"       ,//12
     "read_stream"   ,//13
     "temp"          ,//14
-    "words_after"    //15
+    "words_after"   ,//15
+    "drive_on"      ,//16
+    "drive_off"      //17
 };
 
-const int nADCmax = 112;
+const int nADCmax = 16;
 extern quint8 nADC;
 
-QString makeCommand(quint16 commandPipeline, QString ranges, QString scanRate, QString readNum);
+QString makeCommand(quint32 commandPipeline, QString ranges, QString scanRate, QString readNum);
 
 class Response{
 public:
@@ -209,8 +213,6 @@ struct Frame{
     void show();
 };
 
-
-
 struct RunContent{
     float ADCtemperatures[nADCmax];
     quint32 FIFOpayload, MSGpayload, tryReadNFrames, ipbusReads, framesCollected;
@@ -220,7 +222,7 @@ struct RunContent{
     QDateTime compilationDateTime;
     quint8 ADCranges[nADCmax] = {0};
     quint16 scanRate;
-    quint16 maskUpdated;
+    quint32 maskUpdated;
 
     RunContent(Run *rc = nullptr);
     void update(Run *);

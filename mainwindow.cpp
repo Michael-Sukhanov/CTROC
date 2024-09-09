@@ -8,8 +8,8 @@ static const QVector<float> //  0  1  2    3    4   5  6    7
     ADCrangeValues_pC        {100,50,25,12.5,6.25,150,75,37.5};
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent), ui(new Ui::MainWindow), rMode(RANGE_SAMPLING_FRAME),
-     darkCalibFileName(""), lightCalibFileName(""),
+    : QMainWindow(parent), ui(new Ui::MainWindow),
+    darkCalibFileName(""), lightCalibFileName(""), currentframeIndex(0),
     lastScanData(nullptr)
 {
     ui->setupUi(this);
@@ -52,8 +52,11 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->pushButton_nextFrame, &QPushButton::clicked, this, &MainWindow::selectedFrameChanged);
     connect(ui->horizontalSlider    , &QSlider::valueChanged, this, &MainWindow::selectedFrameChanged);
     connect(ui->pushButton_rangeMode, &QPushButton::clicked, this, [=, this](bool checked){
+        if(frames.isEmpty()) return;
         rMode = checked ? RANGE_SAMPLING_FRAME : RANGE_SINGLE_FRAME;
-        updateMap(frames[currentframeIndex], ui->plotMap, colorMap);
+        updateMap(frames[currentframeIndex], ui->plotMap, colorMap, rMode == RANGE_SAMPLING_FRAME ?
+                  getMapRange(frames) :
+                  getMapRange(frames[currentframeIndex]));
         ui->pushButton_rangeMode->setText(checked ? "Samples" : "Single");
     });
 
@@ -81,7 +84,7 @@ MainWindow::MainWindow(QWidget *parent)
     for(auto &el : pushButtonsList){
         auto elCommand = getCorrespondingCommand(el);
         el->setText(COMMANDS[getCorrespondingBitNo(el)]);
-        connect(el, &QPushButton::clicked, this, [=](){
+        connect(el, &QPushButton::clicked, this, [=, this](){
             QLineEdit* le = this->findChild<QLineEdit*>("lineEdit_com_" + el->objectName().mid(el->objectName().lastIndexOf("_")+1));
             Tcpclient->sendRunCommand(getCorrespondingCommand(el),
                 elCommand == Command::ADCrange   ? le->text() : "",
@@ -92,8 +95,13 @@ MainWindow::MainWindow(QWidget *parent)
         });
     }
 
-    connect(ui->pushButton_disDark,  &QPushButton::clicked, this, [=, this]{ui->pushButton_disDark ->setVisible(false); darkFrame  = Frame(FrameDARK);  ui->label_Dark ->setText("Disabled"); getScanData(lastScanData);});
-    connect(ui->pushButton_disLight, &QPushButton::clicked, this, [=, this]{ui->pushButton_disLight->setVisible(false); lightFrame = Frame(FrameLIGHT); ui->label_Light->setText("Disabled"); getScanData(lastScanData);});
+    connect(ui->pushButton_disDark,  SIGNAL(clicked()), this, SLOT(disableCalibration()));
+    connect(ui->pushButton_disLight, SIGNAL(clicked()), this, SLOT(disableCalibration()));
+
+    connect(ui->pushButton_drive, &QPushButton::clicked, this, [=, this](bool checked){
+        Tcpclient->sendRunCommand(checked ? Command::drive_on : Command::drive_off, "", "", "");
+        ui->pushButton_drive->setText(checked ? "drive_off" : "drive_on");
+    });
 
     //обработка поведения check-boxов
     QList<QCheckBox*> checkBoxes = this->findChildren<QCheckBox*>(QRegularExpression("checkBox_*"));
@@ -106,6 +114,9 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->plotMap     , &QCustomPlot::plottableClick, this, &MainWindow::saveImage);
     connect(ui->plotMapMean , &QCustomPlot::plottableClick, this, &MainWindow::saveImage);
     connect(ui->plotMapSigma, &QCustomPlot::plottableClick, this, &MainWindow::saveImage);
+
+    connect(ui->histMean , SIGNAL(mouseWheel(QWheelEvent*)), this, SLOT(changeCorrespondingRange(QWheelEvent*)));
+    connect(ui->histSigma, SIGNAL(mouseWheel(QWheelEvent*)), this, SLOT(changeCorrespondingRange(QWheelEvent*)));
 
     meanBars = new QCPBars(ui->histMean->xAxis, ui->histMean->yAxis);
     stdBars  = new QCPBars(ui->histSigma->xAxis, ui->histSigma->yAxis);
@@ -154,6 +165,8 @@ MainWindow::MainWindow(QWidget *parent)
     else{
         msgBox.setText("Файл калибровки темнового поля " + darkCalibFileName + " не найден");
         msgBox.exec();
+        ui->label_Dark->setText("Disabled");
+        ui->pushButton_disDark->setVisible(false);
         darkFrame  = Frame(FrameDARK);
     }
 
@@ -161,6 +174,8 @@ MainWindow::MainWindow(QWidget *parent)
     else{
         msgBox.setText("Файл калибровки светового поля " + lightCalibFileName + " не найден");
         msgBox.exec();
+        ui->label_Light->setText("Disabled");
+        ui->pushButton_disLight->setVisible(false);
         lightFrame = Frame(FrameLIGHT);
     }
 
@@ -202,14 +217,16 @@ quint8 MainWindow::getCorrespondingBitNo(QWidget *wgt){
     return wgt->objectName().split("_", Qt::SkipEmptyParts).last().toUInt();
 }
 
-void MainWindow::updateMap(Frame &fr, QCustomPlot *&plot, QCPColorMap *&cmap){
+void MainWindow::updateMap(Frame &fr, QCustomPlot *&plot, QCPColorMap *&cmap, QCPRange range){
     cmap->data()->setSize(fr.sizeZ, fr.sizeX);
     cmap->data()->setRange(QCPRange(0.5,fr.sizeZ - 0.5), QCPRange(0.5, fr.sizeX - 0.5));
 
     for(auto i = 0; i < fr.sizeZ; ++i)
-        for(auto k = 0; k < fr.sizeX; ++k)
+        for(auto k = 0; k < fr.sizeX; ++k){
             cmap->data()->setCell(i, k, fr(i, k));
-    cmap->setDataRange(rMode == RANGE_SAMPLING_FRAME && plot == ui->plotMap ? getMapRange(frames.begin(), frames.end()) : QCPRange(fr.min(), fr.max()));
+            // cmap->
+        }
+    cmap->setDataRange(range);
     plot->xAxis->setRange(QCPRange(0, fr.sizeZ));
     plot->yAxis->setRange(QCPRange(0, fr.sizeX));
     plot->replot();
@@ -251,7 +268,9 @@ void MainWindow::updateHisto(Frame &fr, QCustomPlot *&plot, QCPBars *&bars){
     double min = fr.min(), max = fr.max(), binWidth = 1;
     if (max>min) {
         int m  = lround(std::log10(max-min)*3 - 6); //define decimal order of magnitude for bin width to be 5/3 lower then whole range magnitude, so there will be about 30-70 bins
-        binWidth = QList<int>({1,2,5})[m%3] * std::pow(10, m/3); //make nice values: 0.1, 0.2, 0.5, 1, 2, 5, 10, 20...
+        // qDebug() << "Max:" << max << "Min:" << min << "Magnitude:" << m;
+        binWidth = QList<int>({1,2,5})[(m%3+3)%3] * std::pow(10, m/3); //make nice values: 0.1, 0.2, 0.5, 1, 2, 5, 10, 20...
+        // qDebug() << QList<int>({1,2,5})[m%3 > 0 ? m%3 : (3 + m%3)] << ((m%3 > 0) ? m%3 : (3 + m%3)) << std::pow(10, m/3) << binWidth;
     };
     plot->xAxis->setRange(min, max);
     plot->yAxis->setRange(0, fr.sizeX*fr.sizeZ);
@@ -280,6 +299,7 @@ void MainWindow::getScanState(ScanState *resp){
 }
 
 void MainWindow::getScanData(ScanData *resp){
+    if(!resp){qDebug() << "Trying to handle scan data: nullptr"; return;}
 
     lastScanData = resp;
     ui->pushButton_getData->setEnabled(true);
@@ -290,10 +310,13 @@ void MainWindow::getScanData(ScanData *resp){
     meanFrame  = Frame(frames.begin(), frames.end(), FrameMEAN , nullptr, lastScanData->getSizeX(), lastScanData->getSizeZ());
     stdevFrame = Frame(frames.begin(), frames.end(), FrameSTDEV, &meanFrame, lastScanData->getSizeX(), lastScanData->getSizeZ());
 
+    qDebug() << frames.size();
+    // qDebug() << frames.first()._max << frames.first().sizeX << frames.first().sizeZ;
 
-    updateMap(frames.first(), ui->plotMap,       colorMap      );
-    updateMap(meanFrame,      ui->plotMapMean,   colorMapMean  );
-    updateMap(stdevFrame,     ui->plotMapSigma,  colorMapStd   );
+    updateMap(frames.first(), ui->plotMap,       colorMap      , rMode ?
+            getMapRange(frames) : getMapRange(frames[currentframeIndex]));
+    updateMap(meanFrame,      ui->plotMapMean,   colorMapMean  , QCPRange(meanFrame.min(), meanFrame.max()));
+    updateMap(stdevFrame,     ui->plotMapSigma,  colorMapStd   , QCPRange(stdevFrame.min(), stdevFrame.max()));
 
     updateHisto(meanFrame, ui->histMean,  meanBars);
     updateHisto(stdevFrame, ui->histSigma, stdBars);
@@ -309,7 +332,7 @@ void MainWindow::getScanData(ScanData *resp){
 
 void MainWindow::getRunResponse(Run *resp){
     runContent.update(resp);
-    quint16 mask = runContent.maskUpdated;
+    quint32 mask = runContent.maskUpdated;
     if(Command::Status      & mask) ui->textEdit_messages->append("Status response received");
     if(Command::CompileTime & mask) ui->textEdit_messages->append("Compilation time: " + runContent.compilationDateTime.toString("yyyy-MM-dd HH:mm:ss"));
     // if(Command::CompileTime & mask) ui->textEdit_messages->append("Compilation time: " + runContent.compilationDateTime.toString(Qt::ISODate));
@@ -408,12 +431,18 @@ void MainWindow::saveImage(QCPAbstractPlottable *  plottable, int  dataIndex, QM
 void MainWindow::selectedFrameChanged(){
     QPushButton *but = qobject_cast<QPushButton*>(sender());
     if(but == ui->pushButton_prevFrame && currentframeIndex > 0)
-        updateMap(frames[--currentframeIndex], ui->plotMap, colorMap);
+        updateMap(frames[--currentframeIndex], ui->plotMap, colorMap, rMode ?
+              getMapRange(frames) :
+              getMapRange(frames[currentframeIndex]));
     else if(but == ui->pushButton_nextFrame && frames.size() - 1 > currentframeIndex)
-        updateMap(frames[++currentframeIndex], ui->plotMap, colorMap);
+        updateMap(frames[++currentframeIndex], ui->plotMap, colorMap, rMode ?
+              getMapRange(frames) :
+              getMapRange(frames[currentframeIndex]));
     else if(qobject_cast<QSlider*>(sender()) == ui->horizontalSlider){
         if(ui->horizontalSlider->value() == currentframeIndex) return;
-        updateMap(frames[currentframeIndex = ui->horizontalSlider->value()], ui->plotMap, colorMap);
+        updateMap(frames[currentframeIndex = ui->horizontalSlider->value()], ui->plotMap, colorMap, rMode ?
+              getMapRange(frames) :
+              getMapRange(frames[currentframeIndex]));
     }
     ui->horizontalSlider->setValue(currentframeIndex);
 
@@ -421,6 +450,16 @@ void MainWindow::selectedFrameChanged(){
     ui->pushButton_nextFrame->setEnabled(currentframeIndex != frames.size() - 1);
     QString txt = QString::asprintf("Frame %d/%d", currentframeIndex + 1, frames.size());
     ui->label_frameNo->setText(txt);
+}
+
+void MainWindow::changeCorrespondingRange(QWheelEvent* ev){
+    qDebug() << ev;
+    QCustomPlot* sndr = qobject_cast<QCustomPlot*>(sender());
+   (sndr == ui->histMean ? colorMapMean : colorMapStd)->setDataRange(sndr->xAxis->range());
+    updateMap(sndr == ui->histMean ? meanFrame : stdevFrame,
+              sndr == ui->histMean ? ui->plotMapMean : ui->plotMapSigma,
+              sndr == ui->histMean ? colorMapMean : colorMapStd,
+              sndr->xAxis->range());
 }
 
 quint16 MainWindow::getUIcommandMask(){
@@ -432,6 +471,15 @@ quint16 MainWindow::getUIcommandMask(){
         if(el->isChecked()) mask |= (1 << bit);
     }
     return mask;
+}
+
+void MainWindow::disableCalibration(){
+    bool isDark = qobject_cast<QPushButton*>(sender()) == ui->pushButton_disDark;
+    qobject_cast<QPushButton*>(sender())->setVisible(false);
+    (isDark ? darkFrame : lightFrame) = Frame(isDark ? FrameDARK : FrameLIGHT);
+    (isDark ? ui->label_Dark : ui->label_Light)->setText("Disabled");
+    (isDark ? darkCalibFileName : lightCalibFileName) = "";
+    getScanData(lastScanData);
 }
 
 QCPColorGradient getGradient(const QList<QColor> &palette){
@@ -497,14 +545,28 @@ void MainWindow::updateLightCalib(QString fileName){
     delete sd;
 }
 
-QCPRange MainWindow::getMapRange(QVector<Frame>::iterator start, QVector<Frame>::iterator stop){
-    float sampleMax = start->max();
-    float sampleMin = start->min();
-    for(auto it = start; it != stop; it++){
-        if(sampleMin > it->min()) sampleMin = it->min();
-        if(sampleMax < it->max()) sampleMax = it->max();
+// QCPRange MainWindow::getMapRange( QVector<Frame>::iterator start, QVector<Frame>::iterator stop){
+//     float sampleMax = start->max();
+//     float sampleMin = start->min();
+//     for(auto it = start; it != stop; it++){
+//         if(sampleMin > it->min()) sampleMin = it->min();
+//         if(sampleMax < it->max()) sampleMax = it->max();
+//     }
+//     return QCPRange(sampleMin, sampleMax);
+// }
+
+QCPRange MainWindow::getMapRange(QVector<Frame> &frames){
+    float sampleMax = frames.first().max();
+    float sampleMin = frames.first().min();
+    for(auto &fr : frames){
+        if(sampleMin > fr.min()) sampleMin = fr.min();
+        if(sampleMax < fr.min()) sampleMax = fr.min();
     }
     return QCPRange(sampleMin, sampleMax);
+}
+
+QCPRange MainWindow::getMapRange(Frame & frame){
+    return QCPRange(frame.min(), frame.max());
 }
 
 void MainWindow::loadSettings(){

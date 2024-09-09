@@ -4,6 +4,7 @@
 #include <QColor>
 
 const QList<QColor> kDarkBodyRadiator{
+        // QColor(148, 000, 211),
         QColor(0, 0, 0),
         QColor(1, 0, 0),
         QColor(2, 0, 0),
@@ -258,6 +259,7 @@ const QList<QColor> kDarkBodyRadiator{
         QColor(241, 242, 213),
         QColor(241, 242, 217),
         QColor(241, 242, 221),
-    QColor(241, 242, 225)};
+        // QColor(148, 000, 211)
+};
 
 #endif // PALETTES_H

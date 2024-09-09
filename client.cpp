@@ -22,7 +22,6 @@ void Client::getMetaInfo(){
     try{
         reconnect(sockInfo, portInfo);
         if(sockInfo->write("GET METAINFO\r\n") == -1) throw sockInfo;
-        requestMetaSent = QTime::currentTime();
     }catch(QTcpSocket* sock){
         std::cout << sock->errorString().toStdString() << std::endl;
     }
@@ -33,7 +32,6 @@ void Client::getScanState()
     try{
         reconnect(sockState, portState);
         if(sockState->write("GET SCANSTATE\r\n") == -1) throw sockState;
-        requestStateSent = QTime::currentTime();
     }catch(QTcpSocket* sock){
         std::cout << sock->errorString().toStdString() << std::endl;
     }
@@ -63,7 +61,7 @@ void Client::getLastScan(){
     }
 }
 
-void Client::sendRunCommand(quint16 mask, QString ranges, QString scanRate, QString readNum){
+void Client::sendRunCommand(quint32 mask, QString ranges, QString scanRate, QString readNum){
     delete runResponse;
     runResponse = nullptr;
     try{
@@ -72,7 +70,7 @@ void Client::sendRunCommand(quint16 mask, QString ranges, QString scanRate, QStr
         // qDebug() << request;
         if(sockRun->write(request.toUtf8()) == -1) throw sockRun;
     }catch(QTcpSocket* sock){
-        std::cout << sock->errorString().toStdString() << std::endl;
+        std::cout << "Could not write to socket: " <<  sock->errorString().toStdString() << std::endl;
     }
 }
 
@@ -83,58 +81,6 @@ void Client::reconnect(QTcpSocket *sock, quint16 &port){
     if(!sock->waitForConnected(connectionTimeout)) throw sock;
     if(!port) port = sock->localPort();
 }
-
-// void Client::read(){
-//     static int fragCnt;
-//     QTcpSocket* sock = qobject_cast<QTcpSocket*>(sender());
-//     if(sock == sockData && responseBuffer){
-//             dataBuffer.append(sock->readAll());
-//             qDebug() << "Got data fragment: " << fragCnt++ << dataBuffer.size() << '/' << responseBuffer->getContentLength();
-//         if(dataBuffer.size() == responseBuffer->getContentLength()){
-//             responseBuffer->setData(dataBuffer);
-//             emit scanDataReady(responseBuffer);
-//             qDebug() << "The data  is full";
-//         }else if(dataBuffer.size() > responseBuffer->getContentLength())
-//             std::cout << "Data buffer bigger than expected" << std::endl;
-//         return;
-//     }
-
-//     QByteArray arrTmp = sock->readAll();
-//     QString tmp = QString(arrTmp);
-//     QStringList list = tmp.split(QRegularExpression("(/|\\s+)"), Qt::SkipEmptyParts);
-//     QStringList::Iterator start = list.begin() + 1;
-
-//     if(sock == sockRun){
-//         qDebug() << QString(arrTmp);
-//     }
-
-//     if(sock == sockInfo){
-//         emit metaInfoReady(new MetaInfo(arrTmp));
-//         *timeLog << "M\t" << requestMetaSent.secsTo(QTime::currentTime()) << std::endl;
-//     }
-
-//     if(sock == sockState){
-//         emit scanStateReady(new ScanState(arrTmp));
-//         *timeLog << "S\t" << requestStateSent.secsTo(QTime::currentTime()) << std::endl;
-//     }
-
-//     if(sock == sockData && !responseBuffer){
-//         fragCnt = 0;
-//         responseBuffer = new ScanData(arrTmp);
-//         dataBuffer.append(arrTmp.mid(arrTmp.lastIndexOf(QByteArray("\r\n\r\n")) + 4));
-//         qDebug() << "Got data fragment: " << fragCnt++;
-
-//         if(dataBuffer.size() == responseBuffer->getContentLength()){
-//             responseBuffer->setData(dataBuffer);
-//             emit scanDataReady(responseBuffer);
-//             qDebug() << "The data  is full";
-//         }
-//         if(responseBuffer->getStatus() != 200) emit scanDataReady(responseBuffer);
-
-//         *timeLog << "D\t" << requestDataSent.secsTo(QTime::currentTime()) << std::endl;
-//     }
-
-// }
 
 void Client::read(){
     QTcpSocket *sock = qobject_cast<QTcpSocket*>(sender());
