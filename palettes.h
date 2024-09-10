@@ -259,7 +259,7 @@ const QList<QColor> kDarkBodyRadiator{
         QColor(241, 242, 213),
         QColor(241, 242, 217),
         QColor(241, 242, 221),
-        // QColor(148, 000, 211)
+        QColor(255, 255, 255)
 };
 
 #endif // PALETTES_H

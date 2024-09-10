@@ -9,7 +9,7 @@ static const QVector<float> //  0  1  2    3    4   5  6    7
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow),
-    darkCalibFileName(""), lightCalibFileName(""), currentframeIndex(0), rMode(RANGE_SAMPLING_FRAME),
+    rMode(RANGE_SAMPLING_FRAME), darkCalibFileName(""), lightCalibFileName(""), currentframeIndex(0),
     lastScanData(nullptr)
 {
     ui->setupUi(this);
@@ -164,7 +164,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     //установка калибровочных фреймов по умолчанию
     msgBox.setIcon(QMessageBox::Information);
-    qDebug() << darkCalibFileName;
     if(QFile::exists(darkCalibFileName)) updateDarkCalib(darkCalibFileName);
     else{
         msgBox.setText("Файл калибровки темнового поля " + darkCalibFileName + " не найден");
@@ -222,17 +221,18 @@ quint8 MainWindow::getCorrespondingBitNo(QWidget *wgt){
 }
 
 void MainWindow::updateMap(Frame &fr, QCustomPlot *&plot, QCPColorMap *&cmap, QCPRange range){
-    cmap->data()->setSize(fr.sizeZ, fr.sizeX);
-    cmap->data()->setRange(QCPRange(0.5,fr.sizeZ - 0.5), QCPRange(0.5, fr.sizeX - 0.5));
+    cmap->data()->setSize(fr.sizeX, fr.sizeZ);
+    cmap->data()->setRange(QCPRange(0.5, fr.sizeX - 0.5), QCPRange(0.5, fr.sizeZ - 0.5));
 
-    for(auto i = 0; i < fr.sizeZ; ++i)
-        for(auto k = 0; k < fr.sizeX; ++k){
-            cmap->data()->setCell(i, k, fr(i, k));
+    for(auto i = 0; i < fr.sizeX; ++i)
+        for(auto k = 0; k < fr.sizeZ; ++k){
+            cmap->data()->setCell(i, k, fr(k, i));
             // cmap->
         }
     cmap->setDataRange(range);
-    plot->xAxis->setRange(QCPRange(0, fr.sizeZ));
-    plot->yAxis->setRange(QCPRange(0, fr.sizeX));
+    plot->xAxis2->setRange(QCPRange(0, fr.sizeX));
+    plot->xAxis->setRange(QCPRange(0, fr.sizeX));
+    plot->yAxis->setRange(QCPRange(0, fr.sizeZ));
     plot->replot();
 }
 
@@ -245,7 +245,10 @@ void MainWindow::initMap(QCustomPlot *&plot, QCPColorMap *&cmap, QCPColorScale *
     plot->axisRect()->setupFullAxesBox(false);
     //plot->xAxis->setLabel("Z");
     //plot->yAxis->setLabel("X");
-
+    plot->yAxis->setRangeReversed(true);
+    plot->xAxis->setTickLabels(false);
+    plot->xAxis2->setVisible(true);
+    plot->xAxis2->setTickLabels(true);
     cmap = new QCPColorMap(plot->xAxis, plot->yAxis);
     cmap->setInterpolate(false);
 
@@ -549,16 +552,6 @@ void MainWindow::updateLightCalib(QString fileName){
     lightCalibFileName = fileName;
     delete sd;
 }
-
-// QCPRange MainWindow::getMapRange( QVector<Frame>::iterator start, QVector<Frame>::iterator stop){
-//     float sampleMax = start->max();
-//     float sampleMin = start->min();
-//     for(auto it = start; it != stop; it++){
-//         if(sampleMin > it->min()) sampleMin = it->min();
-//         if(sampleMax < it->max()) sampleMax = it->max();
-//     }
-//     return QCPRange(sampleMin, sampleMax);
-// }
 
 QCPRange MainWindow::getMapRange(QVector<Frame> &frames){
     float sampleMax = frames.first().max();

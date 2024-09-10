@@ -65,9 +65,6 @@ private:
 
     QMessageBox msgBox;  
 
-    //Получаем имя калибровочного файла на основе полученных в run content данных
-    QString getCalibrationFileName(FramePurpose fp);
-
     //используется для отображения, сохранения и загрузки данных с последнего скана
     ScanData *lastScanData;
 
@@ -78,7 +75,6 @@ private:
     void updateDarkCalib(QString fileName);
     void updateLightCalib(QString fileName);
 
-    // QCPRange getMapRange(const QVector<Frame>::iterator start, const QVector<Frame>::iterator stop);
     QCPRange getMapRange(QVector<Frame> &frames);
     QCPRange getMapRange(Frame&);
 
