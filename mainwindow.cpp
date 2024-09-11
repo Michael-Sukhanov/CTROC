@@ -115,22 +115,13 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->plotMapMean , &QCustomPlot::plottableClick, this, &MainWindow::saveImage);
     connect(ui->plotMapSigma, &QCustomPlot::plottableClick, this, &MainWindow::saveImage);
 
-    connect(ui->histMean,  &QCustomPlot::mouseWheel,   this, [=, this](QWheelEvent *ev){changeCorrespondingRange();});
-    connect(ui->histMean,  &QCustomPlot::mouseRelease, this, [=, this](QMouseEvent *ev){changeCorrespondingRange();});
-    connect(ui->histSigma, &QCustomPlot::mouseWheel,   this, [=, this](QWheelEvent *ev){changeCorrespondingRange();});
-    connect(ui->histSigma, &QCustomPlot::mouseRelease, this, [=, this](QMouseEvent *ev){changeCorrespondingRange();});
-
-
+    Bars     = new QCPBars(ui->hist->xAxis, ui->hist->yAxis);
     meanBars = new QCPBars(ui->histMean->xAxis, ui->histMean->yAxis);
     stdBars  = new QCPBars(ui->histSigma->xAxis, ui->histSigma->yAxis);
 
-    ui->histSigma->setInteractions(QCP::iRangeZoom | QCP::iRangeDrag);
-    ui->histSigma->axisRect()->setRangeDrag(Qt::Horizontal);
-    ui->histSigma->axisRect()->setRangeZoom(Qt::Horizontal);
-
-    ui->histMean ->setInteractions(QCP::iRangeZoom | QCP::iRangeDrag);
-    ui->histMean ->axisRect()->setRangeDrag(Qt::Horizontal);
-    ui->histMean ->axisRect()->setRangeZoom(Qt::Horizontal);
+    initHisto(ui->hist, colorScale);
+    initHisto(ui->histMean, colorScaleMean);
+    initHisto(ui->histSigma, colorScaleStd);
 
     //menuBar для сохранения и загрузки пакетов и калибровок
     QMenu* fileMenu = menuBar()->addMenu(tr("&File"));
@@ -141,8 +132,9 @@ MainWindow::MainWindow(QWidget *parent)
         if(lastScanData) lastScanData->storePacket(fileName);
     });
     connect(fileMenu->addAction("Load data ..."), &QAction::triggered, this, [=, this](bool trig){
-        QString fileName = QFileDialog::getOpenFileName(this, tr("Open file"), "", tr("*.dat"));
+        QString fileName = QFileDialog::getOpenFileName(this, tr("Open file"), path, tr("*.dat"));
         if(fileName.isEmpty()) return;
+        path = QFileInfo(fileName).absolutePath();
         if(lastScanData) delete lastScanData;
         lastScanData = new ScanData(fileName);
         if(lastScanData->isPacketValid()) emit scanDataLoaded(lastScanData);
@@ -150,12 +142,16 @@ MainWindow::MainWindow(QWidget *parent)
     });
     fileMenu->addSeparator();
     connect(fileMenu->addAction("Load and apply Dark ..."), &QAction::triggered, this, [=, this]{
-        QString fileName = QFileDialog::getOpenFileName(this, tr("Select dark data to calib"), "", tr("*.dat"));
+        QString fileName = QFileDialog::getOpenFileName(this, tr("Select dark data to calib"), path, tr("*.dat"));
+        if(fileName.isEmpty()) return;
         updateDarkCalib(fileName);
+        path = QFileInfo(fileName).absolutePath();
     });
     connect(fileMenu->addAction("Load and apply Light ..."), &QAction::triggered, this, [=, this]{
-        QString fileName = QFileDialog::getOpenFileName(this, tr("Select dark data to calib"), "", tr("*.dat"));
+        QString fileName = QFileDialog::getOpenFileName(this, tr("Select dark data to calib"), path, tr("*.dat"));
+        if(fileName.isEmpty()) return;
         updateLightCalib(fileName);
+        path = QFileInfo(fileName).absolutePath();
     });
 
     connect(fileMenu, &QMenu::aboutToShow, this, [=, this](){fileMenu->actions()[0]->setEnabled(lastScanData);});
@@ -181,6 +177,22 @@ MainWindow::MainWindow(QWidget *parent)
         ui->pushButton_disLight->setVisible(false);
         lightFrame = Frame(FrameLIGHT);
     }
+
+    connect(ui->pushButton_play, &QPushButton::clicked, this, [=, this](bool checked){
+        if(frames.isEmpty()){ui->pushButton_play->setChecked(false); return;}
+        ui->pushButton_play->setText(checked ? "⏸" : "⏵");
+        if(checked) timer.start(40);
+        else timer.stop();
+    });
+
+    connect(&timer, &QTimer::timeout, this, [=, this](){
+        currentframeIndex++;
+        selectedFrameChanged();
+        if(currentframeIndex == frames.size() - 1){
+            ui->pushButton_play->click();
+            currentframeIndex = 0;
+        }
+    });
 
 }
 
@@ -257,6 +269,7 @@ void MainWindow::initMap(QCustomPlot *&plot, QCPColorMap *&cmap, QCPColorScale *
     cscale->setType(QCPAxis::atRight); // scale shall be vertical bar with tick/axis labels right (actually atRight is already the default)
     cscale->axis()->setTickLengthOut(cscale->axis()->tickLengthIn()/2);
     cscale->axis()->setSubTickLengthOut(cscale->axis()->subTickLengthIn()/2);
+    // cscale->axis()->
     cmap->setColorScale(cscale); // associate the color map with the color scale
     //cscale->axis()->setLabel("ADC units");
 
@@ -268,16 +281,22 @@ void MainWindow::initMap(QCustomPlot *&plot, QCPColorMap *&cmap, QCPColorScale *
     cscale->setMarginGroup(QCP::msBottom|QCP::msTop, marginGroup);
     cscale->setRangeDrag(false);
     cscale->setRangeZoom(false);
+}
 
+void MainWindow::initHisto(QCustomPlot *&plot, QCPColorScale* &cscale){
+    plot->setInteractions(QCP::iRangeZoom | QCP::iRangeDrag);
+    plot->axisRect()->setRangeDrag(Qt::Horizontal);
+    plot->axisRect()->setRangeZoom(Qt::Horizontal);
+
+    connect(plot,  &QCustomPlot::mouseWheel,   this, [=, this](QWheelEvent *ev){changeCorrespondingRange();});
+    connect(plot,  &QCustomPlot::mouseRelease, this, [=, this](QMouseEvent *ev){changeCorrespondingRange();});
 }
 
 void MainWindow::updateHisto(Frame &fr, QCustomPlot *&plot, QCPBars *&bars){
     double min = fr.min(), max = fr.max(), binWidth = 1;
     if (max>min) {
         int m  = lround(std::log10(max-min)*3 - 6); //define decimal order of magnitude for bin width to be 5/3 lower then whole range magnitude, so there will be about 30-70 bins
-        // qDebug() << "Max:" << max << "Min:" << min << "Magnitude:" << m;
         binWidth = QList<int>({1,2,5})[(m%3+3)%3] * std::pow(10, m/3); //make nice values: 0.1, 0.2, 0.5, 1, 2, 5, 10, 20...
-        // qDebug() << QList<int>({1,2,5})[m%3 > 0 ? m%3 : (3 + m%3)] << ((m%3 > 0) ? m%3 : (3 + m%3)) << std::pow(10, m/3) << binWidth;
     };
     plot->xAxis->setRange(min, max);
     plot->yAxis->setRange(0, fr.sizeX*fr.sizeZ);
@@ -290,7 +309,9 @@ void MainWindow::updateHisto(Frame &fr, QCustomPlot *&plot, QCPBars *&bars){
     if (ok) plot->xAxis->setRange(rngx.lower-binWidth/2, rngx.upper+binWidth/2);
     auto rngy = bars->getValueRange(ok);
     if (ok) plot->yAxis->setRangeUpper(rngy.upper);
+
     plot->replot();
+
 }
 
 void MainWindow::getMetaInfo(MetaInfo *resp){
@@ -325,8 +346,9 @@ void MainWindow::getScanData(ScanData *resp){
     updateMap(meanFrame,      ui->plotMapMean,   colorMapMean  , QCPRange(meanFrame.min(), meanFrame.max()));
     updateMap(stdevFrame,     ui->plotMapSigma,  colorMapStd   , QCPRange(stdevFrame.min(), stdevFrame.max()));
 
-    updateHisto(meanFrame, ui->histMean,  meanBars);
-    updateHisto(stdevFrame, ui->histSigma, stdBars);
+    updateHisto(frames.first(), ui->hist     , Bars    );
+    updateHisto(meanFrame     , ui->histMean , meanBars);
+    updateHisto(stdevFrame    , ui->histSigma, stdBars );
 
     currentframeIndex = 0;
     ui->pushButton_prevFrame->setEnabled(false);
@@ -369,26 +391,6 @@ void MainWindow::getRunResponse(Run *resp){
     runGUIControl(true);
 }
 
-void MainWindow::writeToFile(QVector<Frame> &frames, QString fname){
-    if(frames.empty()) return;
-    std::ofstream stream(fname.toStdString(), std::ios::binary);
-    for(auto it = frames.begin(); it != frames.end(); ++it){
-        stream.write(reinterpret_cast<char*>(&it->header), sizeof(it->header));
-        stream.write(reinterpret_cast<char*>(it->data), it->sizeX * it->sizeZ * sizeof(float));
-    }
-    stream.close();
-}
-
-void MainWindow::writeToFile(ScanData *sd, QString fileName){
-    std::ofstream outHeader((fileName + ".hdr").toStdString(), std::ios::out);
-    outHeader << QString::asprintf("Matrix-Size-X: %u\nMatrix-Size-Z: %u\nBytes-Per-Pixel: %u", sd->getSizeX(), sd->getSizeZ(), sd->getBytesPerPixel()).toStdString();
-    outHeader.close();
-
-    std::ofstream outData((fileName + ".dat").toStdString(), std::ios::out | std::ios::binary);
-    outData.write(sd->getData(), sd->getContentLength());
-    outData.close();
-}
-
 void MainWindow::sendRunCommand(){
     quint16 msk = getUIcommandMask();
     if(msk) Tcpclient->sendRunCommand(msk, ADCRangeLE->text(), setRateLE->text(), readStreamLE->text());
@@ -404,14 +406,9 @@ void MainWindow::saveImage(QCPAbstractPlottable *  plottable, int  dataIndex, QM
     QAction *pdfSave = menu->addAction("Save");
     QAction *saveAs = menu->addAction("Save as...");
 
-    // QAction *showDark = nullptr;
-    // if(darkFrame) showDark = menu->addAction("Show dark frame");
-    // QAction *showLight= nullptr;
-    // if(lightFrame)showLight = menu->addAction("Show light frame");
 
     QCustomPlot* plotObj = qobject_cast<QCustomPlot*>(sender());
-    // QCPColorMap* colMap = plotObj->objectName() == "plotMap" ? colorMap : (plotObj->objectName() == "plotMapMean" ? colorMapMean : colorMapStd);
-    //QCPTextElement *te = dynamic_cast<QCPTextElement*>(plotObj->plotLayout()->element(0,0));
+
 
     connect(pdfSave, &QAction::triggered, this, [=](bool trig){plotObj->savePdf(QDateTime::currentDateTime().toString("yyMMddHHmmss") + ".pdf");}, Qt::ConnectionType::UniqueConnection);
     connect(saveAs, &QAction::triggered, this, [=](bool trig){
@@ -422,50 +419,41 @@ void MainWindow::saveImage(QCPAbstractPlottable *  plottable, int  dataIndex, QM
         if(format == "bmp") plotObj->saveBmp(fileName);
         if(format == "png") plotObj->savePng(fileName);
         if(format == "pdf") plotObj->savePdf(fileName);
-        if(format == "dat") {
-            if(plotObj == ui->plotMapMean ) meanFrame.writeToFile(fileName);
-            if(plotObj == ui->plotMapSigma) stdevFrame.writeToFile(fileName);
-            if(plotObj == ui->plotMap     ) writeToFile(frames);
-        }
     });
-    // if(showDark)  connect(showDark, &QAction::triggered, this, [=](bool trig){updateMap(*darkFrame, ui->plotMap, colorMap);});
-    // if(showLight) connect(showLight, &QAction::triggered, this, [=](bool trig){updateMap(*lightFrame, ui->plotMap, colorMap);});
-
     menu->popup(evnt->globalPos());
 
 }
 
 void MainWindow::selectedFrameChanged(){
     QPushButton *but = qobject_cast<QPushButton*>(sender());
-    if(but == ui->pushButton_prevFrame && currentframeIndex > 0)
-        updateMap(frames[--currentframeIndex], ui->plotMap, colorMap, rMode ?
-              getMapRange(frames) :
-              getMapRange(frames[currentframeIndex]));
-    else if(but == ui->pushButton_nextFrame && frames.size() - 1 > currentframeIndex)
-        updateMap(frames[++currentframeIndex], ui->plotMap, colorMap, rMode ?
-              getMapRange(frames) :
-              getMapRange(frames[currentframeIndex]));
-    else if(qobject_cast<QSlider*>(sender()) == ui->horizontalSlider){
-        if(ui->horizontalSlider->value() == currentframeIndex) return;
-        updateMap(frames[currentframeIndex = ui->horizontalSlider->value()], ui->plotMap, colorMap, rMode ?
-              getMapRange(frames) :
-              getMapRange(frames[currentframeIndex]));
-    }
+
+    if(but == ui->pushButton_prevFrame && currentframeIndex > 0) --currentframeIndex;
+    else if (but == ui->pushButton_nextFrame && currentframeIndex < frames.size()) ++currentframeIndex;
+    else if(qobject_cast<QSlider*>(sender()) == ui->horizontalSlider && ui->horizontalSlider->value() != currentframeIndex)
+        currentframeIndex = ui->horizontalSlider->value();
+
+    updateMap(frames[currentframeIndex], ui->plotMap, colorMap, rMode ? getMapRange(frames) : getMapRange(frames[currentframeIndex]));
+
     ui->horizontalSlider->setValue(currentframeIndex);
 
     ui->pushButton_prevFrame->setEnabled(currentframeIndex);
     ui->pushButton_nextFrame->setEnabled(currentframeIndex != frames.size() - 1);
-    QString txt = QString::asprintf("Frame %d/%d", currentframeIndex + 1, frames.size());
-    ui->label_frameNo->setText(txt);
+    ui->label_frameNo->setText(QString::asprintf("Frame %d/%d", currentframeIndex + 1, frames.size()));
+
+    updateHisto(frames[currentframeIndex], ui->hist, Bars);
 }
 
 void MainWindow::changeCorrespondingRange(){
     QCustomPlot* sndr = qobject_cast<QCustomPlot*>(sender());
-   (sndr == ui->histMean ? colorMapMean : colorMapStd)->setDataRange(sndr->xAxis->range());
-    updateMap(sndr == ui->histMean ? meanFrame : stdevFrame,
-              sndr == ui->histMean ? ui->plotMapMean : ui->plotMapSigma,
-              sndr == ui->histMean ? colorMapMean : colorMapStd,
-              sndr->xAxis->range());
+    Frame* fr; QCustomPlot* map; QCPColorMap* cmap;
+    if(sndr == ui->hist     ){ fr = &frames[currentframeIndex]; map = ui->plotMap     ; cmap = colorMap    ;}
+    else
+    if(sndr == ui->histMean ){ fr = &meanFrame                ; map = ui->plotMapMean ; cmap = colorMapMean;}
+    else
+    if(sndr == ui->histSigma){ fr = &stdevFrame               ; map = ui->plotMapSigma; cmap = colorMapStd ;}
+    else return;
+
+    updateMap(*fr, map, cmap, sndr->xAxis->range());
 }
 
 quint16 MainWindow::getUIcommandMask(){
@@ -513,6 +501,7 @@ void MainWindow::saveSettings(){
     settings->beginGroup("Calibration");
     settings->setValue("Dark_file", darkCalibFileName);
     settings->setValue("Light_file", lightCalibFileName);
+    settings->setValue("Path", path);
     settings->endGroup();
 
     settings->sync();
@@ -535,7 +524,11 @@ Frame MainWindow::getLighFrame(ScanData *sd){
 
 void MainWindow::updateDarkCalib(QString fileName){
     ui->pushButton_disDark->setVisible(true);
-    ui->label_Dark->setText(fileName);
+
+    ui->label_Dark->setText(QFileInfo(fileName).fileName());
+    ui->label_Dark->setToolTip(QFileInfo(fileName).absoluteFilePath());
+    ui->label_Dark->setToolTipDuration(-1);
+
     if(fileName.isEmpty()) return;
     ScanData* sd = new ScanData(fileName);
     darkFrame = getDarkFrame(sd);
@@ -545,7 +538,11 @@ void MainWindow::updateDarkCalib(QString fileName){
 
 void MainWindow::updateLightCalib(QString fileName){
     ui->pushButton_disLight->setVisible(true);
-    ui->label_Light->setText(fileName);
+
+    ui->label_Light->setText(QFileInfo(fileName).fileName());
+    ui->label_Light->setToolTip(QFileInfo(fileName).absoluteFilePath());
+    ui->label_Light->setToolTipDuration(-1);
+
     if(fileName.isEmpty()) return;
     ScanData* sd = new ScanData(fileName);
     lightFrame = getLighFrame(sd);
@@ -588,5 +585,6 @@ void MainWindow::loadSettings(){
     settings->beginGroup("Calibration");
     darkCalibFileName = settings->value("Dark_file", "").toString();
     lightCalibFileName = settings->value("Light_file", "").toString();
+    path = settings->value("Path", "").toString();
     settings->endGroup();
 }

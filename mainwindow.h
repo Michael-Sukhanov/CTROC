@@ -6,6 +6,7 @@
 #include <qcustomplot.h>
 #include <palettes.h>
 #include <QSettings>
+#include <QTimer>
 
 QCPColorGradient getGradient(const QList<QColor> &palette);
 extern quint8 nADC;
@@ -33,7 +34,7 @@ private:
     Ui::MainWindow *ui;
     QCPColorMap *colorMap, *colorMapMean, *colorMapStd;
     QCPColorScale *colorScale, *colorScaleMean, *colorScaleStd;
-    QCPBars *meanBars, *stdBars;
+    QCPBars *Bars, *meanBars, *stdBars;
     Range_Mode rMode;
 
     QString peerIP;
@@ -44,7 +45,7 @@ private:
 
     QVector<Frame> frames;
     Frame meanFrame, stdevFrame, darkFrame, lightFrame;
-    QString darkCalibFileName, lightCalibFileName;
+    QString darkCalibFileName, lightCalibFileName, path;
 
     quint32 currentframeIndex;
 
@@ -53,6 +54,7 @@ private:
     void getRawFrames(ScanData *response, QVector<Frame> &);
     void runGUIControl(bool enabled);
     void correctFrames(QVector<Frame>::iterator start, QVector<Frame>::iterator stop);
+
 
     quint16 getCorrespondingCommand(QWidget*);
     quint8 getCorrespondingBitNo(QWidget*);
@@ -78,17 +80,19 @@ private:
     QCPRange getMapRange(QVector<Frame> &frames);
     QCPRange getMapRange(Frame&);
 
+    QTimer timer;
+
 private slots:
     void updateMap(Frame &, QCustomPlot *&plot, QCPColorMap* &cmap, QCPRange range);
     void initMap(QCustomPlot *&plot, QCPColorMap* &cmap, QCPColorScale* &cscale, QString title = "Title");
+
+    void initHisto(QCustomPlot* &plot, QCPColorScale* &cscale);
     void updateHisto(Frame &fr, QCustomPlot *&plot, QCPBars *&bars);
 
     void getMetaInfo (MetaInfo  *);
     void getScanState(ScanState *);
     void getScanData (ScanData  *);
     void getRunResponse(Run     *);
-    void writeToFile (QVector<Frame> &vec, QString fname = "pixel_by_pixel.dat");
-    void writeToFile (ScanData  *, QString fileName = "scan");
     void sendRunCommand();
     void saveImage(QCPAbstractPlottable *  plottable, int  dataIndex, QMouseEvent* evnt);
 
