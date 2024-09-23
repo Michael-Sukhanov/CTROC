@@ -67,7 +67,7 @@ private:
     void loadSettings();
     void saveSettings();
 
-    QMessageBox msgBox;  
+    QMessageBox msgBox;
 
     //используется для отображения, сохранения и загрузки данных с последнего скана
     ScanData *lastScanData;

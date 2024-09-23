@@ -19,8 +19,8 @@ MainWindow::MainWindow(QWidget *parent)
 
     //указатели на LineEditы нужны, чтобы загрузить настройки и связать их с команадами
     ADCRangeLE   = this->findChild<QLineEdit*>(QString::asprintf("lineEdit_com_%u", Command::bitNo_ADCrange  )),
-    setRateLE    = this->findChild<QLineEdit*>(QString::asprintf("lineEdit_com_%u", Command::bitNo_Scanrate  )),
-    readStreamLE = this->findChild<QLineEdit*>(QString::asprintf("lineEdit_com_%u", Command::bitNo_ReadStream));
+        setRateLE    = this->findChild<QLineEdit*>(QString::asprintf("lineEdit_com_%u", Command::bitNo_Scanrate  )),
+        readStreamLE = this->findChild<QLineEdit*>(QString::asprintf("lineEdit_com_%u", Command::bitNo_ReadStream));
 
     loadSettings();
     //Только после загрузки настроек создаем клиент, поскольку в нем находится инфа о IP и порте пира
@@ -57,7 +57,7 @@ MainWindow::MainWindow(QWidget *parent)
         rMode = checked ? RANGE_SAMPLING_FRAME : RANGE_SINGLE_FRAME;
         singleFrameMap->update(rMode == RANGE_SAMPLING_FRAME ?
                                    getValueRange(frames) :
-                         getValueRange(frames[currentframeIndex]));
+                                   getValueRange(frames[currentframeIndex]));
         ui->pushButton_rangeMode->setText(checked ? "Samples" : "Single");
     });
 
@@ -88,10 +88,10 @@ MainWindow::MainWindow(QWidget *parent)
         connect(el, &QPushButton::clicked, this, [=, this](){
             QLineEdit* le = this->findChild<QLineEdit*>("lineEdit_com_" + el->objectName().mid(el->objectName().lastIndexOf("_")+1));
             Tcpclient->sendRunCommand(getCorrespondingCommand(el),
-                elCommand == Command::ADCrange   ? le->text() : "",
-                elCommand == Command::Scanrate   ? le->text() : "",
-                elCommand == Command::ReadStream ? le->text() : ""
-            );
+                                      elCommand == Command::ADCrange   ? le->text() : "",
+                                      elCommand == Command::Scanrate   ? le->text() : "",
+                                      elCommand == Command::ReadStream ? le->text() : ""
+                                      );
             runGUIControl(false);
         });
     }
@@ -291,7 +291,7 @@ void MainWindow::getRunResponse(Run *resp){
     if(Command::Nlines      & mask) ui->textEdit_messages->append(QString::asprintf("Number of ADCs (lines): %d", runContent.numLines));
     if(Command::ADCrange    & mask) {
         QString st="ADCnumber:"; for(auto i = 0; i < nADC; ++i) st+=QString::asprintf("%5u"  ,                                       i  ); ui->textEdit_messages->append(st);
-                st="range, pC:"; for(auto i = 0; i < nADC; ++i) st+=QString::asprintf("%5.3g",ADCrangeValues_pC[runContent.ADCranges[i]]); ui->textEdit_messages->append(st);
+        st="range, pC:"; for(auto i = 0; i < nADC; ++i) st+=QString::asprintf("%5.3g",ADCrangeValues_pC[runContent.ADCranges[i]]); ui->textEdit_messages->append(st);
     }
     if(Command::Scanrate    & mask) ui->textEdit_messages->append(QString::asprintf("Exposure time set to %.1f ms", runContent.scanRate * 0.1));
     if(Command::mux_adc     & mask) ui->textEdit_messages->append("Set MUX"     );
@@ -308,7 +308,7 @@ void MainWindow::getRunResponse(Run *resp){
     }
     if(Command::Temperature & mask) {
         QString st="ADCnumber:"; for(auto i = 0; i < nADC; ++i) st+=QString::asprintf("%5u"  ,                           i) ; ui->textEdit_messages->append(st);
-                st="temp., °C:"; for(auto i = 0; i < nADC; ++i) st+=QString::asprintf("%5.3g",runContent.ADCtemperatures[i]); ui->textEdit_messages->append(st);
+        st="temp., °C:"; for(auto i = 0; i < nADC; ++i) st+=QString::asprintf("%5.3g",runContent.ADCtemperatures[i]); ui->textEdit_messages->append(st);
     }
     if(Command::RemainWords & mask) ui->textEdit_messages->append(QString::asprintf("Data FIFO payload: %u 32-bit words", runContent.FIFOpayload));
     runGUIControl(true);
