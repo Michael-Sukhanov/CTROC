@@ -41,8 +41,6 @@ private:
     quint16 portInfo = 0, portState = 0, portData = 0, portRun = 0, peerPort;
     QString peerIP;
     int connectionTimeout;
-    // std::ofstream* timeLog;
-    // QTime requestDataSent, requestMetaSent, requestStateSent, requestRunCommand;
 
     QTcpSocket *sockInfo, *sockData, *sockState, *sockRun;
     void reconnect(QTcpSocket * sock, quint16 &port);

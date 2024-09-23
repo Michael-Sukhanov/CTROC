@@ -70,7 +70,7 @@ private:
     QMessageBox msgBox;
 
     //используется для отображения, сохранения и загрузки данных с последнего скана
-    ScanData *lastScanData;
+    ScanData *lastScanData, *fileScanData;
 
     //функция получения калибровочных фреймов
     Frame getDarkFrame(ScanData*);

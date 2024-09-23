@@ -60,6 +60,7 @@ class Response{
 public:
     Response(QByteArray &_ba);
     Response(QString fileName);
+    Response(const Response &other);
     ~Response();
 
     float   getVersion() const;
@@ -121,6 +122,7 @@ class ScanData : public Response{
 public:
     ScanData(QByteArray &_ba);
     ScanData(QString fileName);
+    ScanData(const ScanData &other);
     ~ScanData();
 
     quint8  getBytesPerPixel() const;

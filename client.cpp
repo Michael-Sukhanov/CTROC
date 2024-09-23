@@ -50,7 +50,7 @@ void Client::getScanData(size_t ln, size_t ff, size_t fc){
 }
 
 void Client::getLastScan(){
-    delete dataResponse;
+    if(dataResponse) delete dataResponse;
     dataResponse = nullptr;
     try{
         reconnect(sockData, portData);

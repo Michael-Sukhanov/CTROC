@@ -18,7 +18,12 @@ Response::Response(QString fileName):version(0),status(0), data(nullptr), conten
     fileData.close();
 }
 
-Response::~Response(){if(data) delete []data;}
+Response::Response(const Response &other):version(other.version),status(other.status),
+    preambleList(other.preambleList),packetValid(other.packetValid),packetFull(other.packetFull){
+    memcpy(data, other.data, contentLength);
+}
+
+Response::~Response(){if(data != nullptr) delete []data;}
 
 float   Response::getVersion()     const {return version;    }
 quint16 Response::getStatus()      const {return status;     }
@@ -108,6 +113,9 @@ quint32 ScanState::getCompleteFrames() const{return completeFrames;}
 ScanData::ScanData(QByteArray &_ba):Response(_ba),sizeX(8*nADC),sizeZ(32),bytesPerPixel(2){_ScanData();}
 
 ScanData::ScanData(QString fileName):Response(fileName),sizeX(8*nADC),sizeZ(32),bytesPerPixel(2){_ScanData();}
+
+ScanData::ScanData(const ScanData &other):Response(other),compression(other.compression),sizeX(other.sizeX),sizeZ(other.sizeZ),
+    framesPerLoop(other.framesPerLoop),loopNumber(other.loopNumber),firstFrame(other.firstFrame),bytesPerPixel(other.bytesPerPixel),framesCount(other.framesCount){}
 
 ScanData::~ScanData(){}
 

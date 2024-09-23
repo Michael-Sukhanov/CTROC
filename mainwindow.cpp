@@ -11,7 +11,7 @@ static const QVector<float> //  0  1  2    3    4   5  6    7
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow),
     rMode(RANGE_SAMPLING_FRAME), darkCalibFileName(""), lightCalibFileName(""), currentframeIndex(0),
-    lastScanData(nullptr)
+    lastScanData(nullptr), fileScanData(nullptr)
 {
     ui->setupUi(this);
 
@@ -133,9 +133,9 @@ MainWindow::MainWindow(QWidget *parent)
         QString fileName = QFileDialog::getOpenFileName(this, tr("Open file"), path, tr("*.dat"));
         if(fileName.isEmpty()) return;
         path = QFileInfo(fileName).absolutePath();
-        if(lastScanData) delete lastScanData;
-        lastScanData = new ScanData(fileName);
-        if(lastScanData->isPacketValid()) emit scanDataLoaded(lastScanData);
+        if(fileScanData) delete fileScanData;
+        fileScanData = new ScanData(fileName);
+        if(fileScanData->isPacketValid()) emit scanDataLoaded(fileScanData);
         else ui->textEdit_messages->append("Unable to show data");
     });
     fileMenu->addSeparator();
