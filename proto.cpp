@@ -18,9 +18,7 @@ Response::Response(QString fileName):version(0),status(0), data(nullptr), conten
     fileData.close();
 }
 
-Response::~Response(){
-    if(data) delete []data;
-}
+Response::~Response(){if(data) delete []data;}
 
 float   Response::getVersion()     const {return version;    }
 quint16 Response::getStatus()      const {return status;     }
@@ -60,11 +58,8 @@ void Response::appendData(QByteArray &_ba){
 }
 
 quint32 Response::getContentLength() const{return contentLength;}
-void Response::showData(){
-    for(quint32 i = 0; i < this->contentLength; ++i){
-        std::cout << data[i];
-    }
-}
+
+void Response::showData(){for(quint32 i = 0; i < this->contentLength; ++i) std::cout << data[i];}
 
 void Response::storePacket(QString fname){
     std::ofstream outHeader(QString(fname.left(fname.lastIndexOf(".") + 1) + "hdr").toStdString(), std::ios::out | std::ios::binary);
@@ -107,7 +102,7 @@ ScanState::ScanState(QByteArray &_ba):Response(_ba){
 
 ScanState::~ScanState(){}
 
-bool ScanState::getInProgress() const{return inProgress;}
+bool ScanState::getInProgress()        const{return inProgress;}
 quint32 ScanState::getCompleteFrames() const{return completeFrames;}
 
 ScanData::ScanData(QByteArray &_ba):Response(_ba),sizeX(8*nADC),sizeZ(32),bytesPerPixel(2){_ScanData();}
@@ -116,11 +111,10 @@ ScanData::ScanData(QString fileName):Response(fileName),sizeX(8*nADC),sizeZ(32),
 
 ScanData::~ScanData(){}
 
-quint8  ScanData::getBytesPerPixel() const{return bytesPerPixel;}
-quint16 ScanData::getSizeX()        const {return sizeX;}
-quint16 ScanData::getSizeZ()        const {return sizeZ;}
-
-quint32 ScanData::getFramesCount() const{return framesCount;}
+quint8  ScanData::getBytesPerPixel() const {return bytesPerPixel;}
+quint16 ScanData::getSizeX()         const {return sizeX;        }
+quint16 ScanData::getSizeZ()         const {return sizeZ;        }
+quint32 ScanData::getFramesCount()   const {return framesCount;  }
 
 void ScanData::_ScanData(){
     framesCount = contentLength/ (bytesPerPixel * sizeX * sizeZ + 32); //по умолчанию, если не известно реальное количество фреймов
@@ -257,14 +251,10 @@ QString makeCommand(quint32 commandPipeline, QString ranges, QString scanRate, Q
     return retValue.join(";");
 }
 
-Run::Run(QByteArray &_ba):Response(_ba){
-    qDebug() << preambleList;
-}
+Run::Run(QByteArray &_ba):Response(_ba){qDebug() << preambleList;}
 Run::~Run(){}
 
-RunContent::RunContent(Run * rc):scanRate(0XFFFF){
-    if(rc) this->update(rc);
-}
+RunContent::RunContent(Run * rc):scanRate(0XFFFF){if(rc) this->update(rc);}
 
 void RunContent::update(Run *r){
     maskUpdated = 0;

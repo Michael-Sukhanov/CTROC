@@ -3,18 +3,19 @@
 
 #include <QMainWindow>
 #include "client.h"
+#include "ctrocplottables.h"
 #include <qcustomplot.h>
 #include <palettes.h>
 #include <QSettings>
 #include <QTimer>
 
-QCPColorGradient getGradient(const QList<QColor> &palette);
 extern quint8 nADC;
 const quint32 nFramesDefault = 1024;
 
 enum Range_Mode{
     RANGE_SINGLE_FRAME, RANGE_SAMPLING_FRAME
 };
+
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -32,9 +33,10 @@ signals:
 
 private:
     Ui::MainWindow *ui;
-    QCPColorMap *colorMap, *colorMapMean, *colorMapStd;
-    QCPColorScale *colorScale, *colorScaleMean, *colorScaleStd;
-    QCPBars *Bars, *meanBars, *stdBars;
+    //класс синхронизирует обновлени гистограмм и карт
+    FrameMap* singleFrameMap, *meanFrameMap, *stdevFrameMap;
+    FrameHist* singleFrameHist, *meanFrameHist, *stdevFrameHist;
+
     Range_Mode rMode;
 
     QString peerIP;
@@ -59,13 +61,13 @@ private:
     quint16 getCorrespondingCommand(QWidget*);
     quint8 getCorrespondingBitNo(QWidget*);
 
-    //для работы с ini файлами
+    //для работы с ini файлом
     QSettings* settings;
 
     void loadSettings();
     void saveSettings();
 
-    QMessageBox msgBox;  
+    QMessageBox msgBox;
 
     //используется для отображения, сохранения и загрузки данных с последнего скана
     ScanData *lastScanData;
@@ -77,17 +79,12 @@ private:
     void updateDarkCalib(QString fileName);
     void updateLightCalib(QString fileName);
 
-    QCPRange getMapRange(QVector<Frame> &frames);
-    QCPRange getMapRange(Frame&);
+    QCPRange getValueRange(QVector<Frame> &frames);
+    QCPRange getValueRange(Frame&);
 
     QTimer timer;
 
 private slots:
-    void updateMap(Frame &, QCustomPlot *&plot, QCPColorMap* &cmap, QCPRange range);
-    void initMap(QCustomPlot *&plot, QCPColorMap* &cmap, QCPColorScale* &cscale, QString title = "Title");
-
-    void initHisto(QCustomPlot* &plot, QCPColorScale* &cscale);
-    void updateHisto(Frame &fr, QCustomPlot *&plot, QCPBars *&bars);
 
     void getMetaInfo (MetaInfo  *);
     void getScanState(ScanState *);
@@ -97,7 +94,6 @@ private slots:
     void saveImage(QCPAbstractPlottable *  plottable, int  dataIndex, QMouseEvent* evnt);
 
     void selectedFrameChanged();
-    void changeCorrespondingRange();
     quint16 getUIcommandMask();
 
     void disableCalibration();

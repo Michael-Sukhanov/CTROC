@@ -3,6 +3,7 @@
 #include <QTcpSocket>
 #include <QDebug>
 #include <stdio.h>
+#include "ctrocplottables.h"
 
 static const QVector<float> //  0  1  2    3    4   5  6    7
     ADCrangeValues_pC        {100,50,25,12.5,6.25,150,75,37.5};
@@ -18,8 +19,8 @@ MainWindow::MainWindow(QWidget *parent)
 
     //указатели на LineEditы нужны, чтобы загрузить настройки и связать их с команадами
     ADCRangeLE   = this->findChild<QLineEdit*>(QString::asprintf("lineEdit_com_%u", Command::bitNo_ADCrange  )),
-    setRateLE    = this->findChild<QLineEdit*>(QString::asprintf("lineEdit_com_%u", Command::bitNo_Scanrate  )),
-    readStreamLE = this->findChild<QLineEdit*>(QString::asprintf("lineEdit_com_%u", Command::bitNo_ReadStream));
+        setRateLE    = this->findChild<QLineEdit*>(QString::asprintf("lineEdit_com_%u", Command::bitNo_Scanrate  )),
+        readStreamLE = this->findChild<QLineEdit*>(QString::asprintf("lineEdit_com_%u", Command::bitNo_ReadStream));
 
     loadSettings();
     //Только после загрузки настроек создаем клиент, поскольку в нем находится инфа о IP и порте пира
@@ -54,9 +55,9 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->pushButton_rangeMode, &QPushButton::clicked, this, [=, this](bool checked){
         if(frames.isEmpty()) return;
         rMode = checked ? RANGE_SAMPLING_FRAME : RANGE_SINGLE_FRAME;
-        updateMap(frames[currentframeIndex], ui->plotMap, colorMap, rMode == RANGE_SAMPLING_FRAME ?
-                  getMapRange(frames) :
-                  getMapRange(frames[currentframeIndex]));
+        singleFrameMap->update(rMode == RANGE_SAMPLING_FRAME ?
+                                   getValueRange(frames) :
+                                   getValueRange(frames[currentframeIndex]));
         ui->pushButton_rangeMode->setText(checked ? "Samples" : "Single");
     });
 
@@ -87,10 +88,10 @@ MainWindow::MainWindow(QWidget *parent)
         connect(el, &QPushButton::clicked, this, [=, this](){
             QLineEdit* le = this->findChild<QLineEdit*>("lineEdit_com_" + el->objectName().mid(el->objectName().lastIndexOf("_")+1));
             Tcpclient->sendRunCommand(getCorrespondingCommand(el),
-                elCommand == Command::ADCrange   ? le->text() : "",
-                elCommand == Command::Scanrate   ? le->text() : "",
-                elCommand == Command::ReadStream ? le->text() : ""
-            );
+                                      elCommand == Command::ADCrange   ? le->text() : "",
+                                      elCommand == Command::Scanrate   ? le->text() : "",
+                                      elCommand == Command::ReadStream ? le->text() : ""
+                                      );
             runGUIControl(false);
         });
     }
@@ -104,24 +105,21 @@ MainWindow::MainWindow(QWidget *parent)
     });
 
     //обработка поведения check-boxов
-    QList<QCheckBox*> checkBoxes = this->findChildren<QCheckBox*>(QRegularExpression("checkBox_*"));
+    QList<QCheckBox*> checkBoxes = this->findChildren<QCheckBox*>(QRegularExpression("checkBox_[0-9]+"));
     for(auto &el : checkBoxes) connect(el, &QCheckBox::clicked, this, [=, this](){ui->pushButton_run->setEnabled(getUIcommandMask());});
 
-    initMap(ui->plotMap,      colorMap,     colorScale    );
-    initMap(ui->plotMapMean,  colorMapMean, colorScaleMean, "Mean map" );
-    initMap(ui->plotMapSigma, colorMapStd,  colorScaleStd , "Stdev map");
+    singleFrameMap = new FrameMap(ui->plotMap);
+    meanFrameMap   = new FrameMap(ui->plotMapMean);
+    stdevFrameMap  = new FrameMap(ui->plotMapSigma);
 
     connect(ui->plotMap     , &QCustomPlot::plottableClick, this, &MainWindow::saveImage);
     connect(ui->plotMapMean , &QCustomPlot::plottableClick, this, &MainWindow::saveImage);
     connect(ui->plotMapSigma, &QCustomPlot::plottableClick, this, &MainWindow::saveImage);
 
-    Bars     = new QCPBars(ui->hist->xAxis, ui->hist->yAxis);
-    meanBars = new QCPBars(ui->histMean->xAxis, ui->histMean->yAxis);
-    stdBars  = new QCPBars(ui->histSigma->xAxis, ui->histSigma->yAxis);
 
-    initHisto(ui->hist, colorScale);
-    initHisto(ui->histMean, colorScaleMean);
-    initHisto(ui->histSigma, colorScaleStd);
+    singleFrameHist = new FrameHist(ui->hist     , singleFrameMap);
+    meanFrameHist   = new FrameHist(ui->histMean , meanFrameMap  );
+    stdevFrameHist  = new FrameHist(ui->histSigma, stdevFrameMap );
 
     //menuBar для сохранения и загрузки пакетов и калибровок
     QMenu* fileMenu = menuBar()->addMenu(tr("&File"));
@@ -189,11 +187,21 @@ MainWindow::MainWindow(QWidget *parent)
         currentframeIndex++;
         selectedFrameChanged();
         if(currentframeIndex == frames.size() - 1){
-            ui->pushButton_play->click();
+            if(!ui->pushButton_repeat->isChecked())ui->pushButton_play->click();
             currentframeIndex = 0;
         }
     });
 
+
+    //Логарифмический масштаб для гистограм
+    QList<QCustomPlot*> hists = findChildren<QCustomPlot*>(QRegularExpression("hist*"));
+    for(auto &el : hists){
+        connect(ui->checkBox_logScale, &QCheckBox::toggled, this, [=](bool checked){
+            el->yAxis->setScaleType(checked ? QCPAxis::stLogarithmic : QCPAxis::stLinear);
+            el->yAxis->setRangeLower(checked ? 0.8 : 0);
+            el->replot();
+        });
+    }
 }
 
 MainWindow::~MainWindow(){
@@ -232,88 +240,6 @@ quint8 MainWindow::getCorrespondingBitNo(QWidget *wgt){
     return wgt->objectName().split("_", Qt::SkipEmptyParts).last().toUInt();
 }
 
-void MainWindow::updateMap(Frame &fr, QCustomPlot *&plot, QCPColorMap *&cmap, QCPRange range){
-    cmap->data()->setSize(fr.sizeX, fr.sizeZ);
-    cmap->data()->setRange(QCPRange(0.5, fr.sizeX - 0.5), QCPRange(0.5, fr.sizeZ - 0.5));
-
-    for(auto i = 0; i < fr.sizeX; ++i)
-        for(auto k = 0; k < fr.sizeZ; ++k){
-            cmap->data()->setCell(i, k, fr(k, i));
-            // cmap->
-        }
-    cmap->setDataRange(range);
-    plot->xAxis2->setRange(QCPRange(0, fr.sizeX));
-    plot->xAxis->setRange(QCPRange(0, fr.sizeX));
-    plot->yAxis->setRange(QCPRange(0, fr.sizeZ));
-    plot->replot();
-}
-
-void MainWindow::initMap(QCustomPlot *&plot, QCPColorMap *&cmap, QCPColorScale *&cscale, QString title){
-    // configure axis rect:
-    // plot->setInteractions(QCP::iRangeDrag|QCP::iRangeZoom); // this will also allow rescaling the color scale by dragging/zooming
-    // plot->plotLayout()->insertRow(0);
-    plot->plotLayout()->insertColumn(1);
-    //plot->plotLayout()->addElement(0, 0, new QCPTextElement(plot, title));
-    plot->axisRect()->setupFullAxesBox(false);
-    //plot->xAxis->setLabel("Z");
-    //plot->yAxis->setLabel("X");
-    plot->yAxis->setRangeReversed(true);
-    plot->xAxis->setTickLabels(false);
-    plot->xAxis2->setVisible(true);
-    plot->xAxis2->setTickLabels(true);
-    cmap = new QCPColorMap(plot->xAxis, plot->yAxis);
-    cmap->setInterpolate(false);
-
-    cscale = new QCPColorScale(plot);
-    plot->plotLayout()->addElement(0, 1, cscale); // add it to the right of the main axis rect
-    cscale->setType(QCPAxis::atRight); // scale shall be vertical bar with tick/axis labels right (actually atRight is already the default)
-    cscale->axis()->setTickLengthOut(cscale->axis()->tickLengthIn()/2);
-    cscale->axis()->setSubTickLengthOut(cscale->axis()->subTickLengthIn()/2);
-    // cscale->axis()->
-    cmap->setColorScale(cscale); // associate the color map with the color scale
-    //cscale->axis()->setLabel("ADC units");
-
-    cmap->setGradient(getGradient(kDarkBodyRadiator));
-
-    // make sure the axis rect and color scale synchronize their bottom and top margins (so they line up):
-    QCPMarginGroup *marginGroup = new QCPMarginGroup(plot);
-    plot->axisRect()->setMarginGroup(QCP::msBottom|QCP::msTop, marginGroup);
-    cscale->setMarginGroup(QCP::msBottom|QCP::msTop, marginGroup);
-    cscale->setRangeDrag(false);
-    cscale->setRangeZoom(false);
-}
-
-void MainWindow::initHisto(QCustomPlot *&plot, QCPColorScale* &cscale){
-    plot->setInteractions(QCP::iRangeZoom | QCP::iRangeDrag);
-    plot->axisRect()->setRangeDrag(Qt::Horizontal);
-    plot->axisRect()->setRangeZoom(Qt::Horizontal);
-
-    connect(plot,  &QCustomPlot::mouseWheel,   this, [=, this](QWheelEvent *ev){changeCorrespondingRange();});
-    connect(plot,  &QCustomPlot::mouseRelease, this, [=, this](QMouseEvent *ev){changeCorrespondingRange();});
-}
-
-void MainWindow::updateHisto(Frame &fr, QCustomPlot *&plot, QCPBars *&bars){
-    double min = fr.min(), max = fr.max(), binWidth = 1;
-    if (max>min) {
-        int m  = lround(std::log10(max-min)*3 - 6); //define decimal order of magnitude for bin width to be 5/3 lower then whole range magnitude, so there will be about 30-70 bins
-        binWidth = QList<int>({1,2,5})[(m%3+3)%3] * std::pow(10, m/3); //make nice values: 0.1, 0.2, 0.5, 1, 2, 5, 10, 20...
-    };
-    plot->xAxis->setRange(min, max);
-    plot->yAxis->setRange(0, fr.sizeX*fr.sizeZ);
-    QMap<double,double> map;
-    for(auto i = 0; i < fr.sizeX*fr.sizeZ; ++i) map[std::round(fr.data[i]/binWidth)*binWidth]+=1;
-    bars->setWidth(binWidth);
-    bars->setData(map.keys().toVector(), map.values().toVector(), true);
-    bool ok;
-    auto rngx = bars->getKeyRange(ok);
-    if (ok) plot->xAxis->setRange(rngx.lower-binWidth/2, rngx.upper+binWidth/2);
-    auto rngy = bars->getValueRange(ok);
-    if (ok) plot->yAxis->setRangeUpper(rngy.upper);
-
-    plot->replot();
-
-}
-
 void MainWindow::getMetaInfo(MetaInfo *resp){
     MetaInfo *mi = resp;
     qDebug() << mi->getStatus() <<  mi->getName() << mi->getAge();
@@ -338,17 +264,14 @@ void MainWindow::getScanData(ScanData *resp){
     meanFrame  = Frame(frames.begin(), frames.end(), FrameMEAN , nullptr, lastScanData->getSizeX(), lastScanData->getSizeZ());
     stdevFrame = Frame(frames.begin(), frames.end(), FrameSTDEV, &meanFrame, lastScanData->getSizeX(), lastScanData->getSizeZ());
 
-    qDebug() << frames.size();
-    // qDebug() << frames.first()._max << frames.first().sizeX << frames.first().sizeZ;
 
-    updateMap(frames.first(), ui->plotMap,       colorMap      , rMode ?
-            getMapRange(frames) : getMapRange(frames[currentframeIndex]));
-    updateMap(meanFrame,      ui->plotMapMean,   colorMapMean  , QCPRange(meanFrame.min(), meanFrame.max()));
-    updateMap(stdevFrame,     ui->plotMapSigma,  colorMapStd   , QCPRange(stdevFrame.min(), stdevFrame.max()));
+    singleFrameMap->update(frames.first(), rMode ? getValueRange(frames) : getValueRange(frames[currentframeIndex]));
+    meanFrameMap  ->update(meanFrame, QCPRange(meanFrame.min() , meanFrame.max()));
+    stdevFrameMap ->update(stdevFrame,QCPRange(stdevFrame.min(), stdevFrame.max()));
 
-    updateHisto(frames.first(), ui->hist     , Bars    );
-    updateHisto(meanFrame     , ui->histMean , meanBars);
-    updateHisto(stdevFrame    , ui->histSigma, stdBars );
+    singleFrameHist->update(frames.first());
+    meanFrameHist->update(meanFrame);
+    stdevFrameHist->update(stdevFrame);
 
     currentframeIndex = 0;
     ui->pushButton_prevFrame->setEnabled(false);
@@ -368,7 +291,7 @@ void MainWindow::getRunResponse(Run *resp){
     if(Command::Nlines      & mask) ui->textEdit_messages->append(QString::asprintf("Number of ADCs (lines): %d", runContent.numLines));
     if(Command::ADCrange    & mask) {
         QString st="ADCnumber:"; for(auto i = 0; i < nADC; ++i) st+=QString::asprintf("%5u"  ,                                       i  ); ui->textEdit_messages->append(st);
-                st="range, pC:"; for(auto i = 0; i < nADC; ++i) st+=QString::asprintf("%5.3g",ADCrangeValues_pC[runContent.ADCranges[i]]); ui->textEdit_messages->append(st);
+        st="range, pC:"; for(auto i = 0; i < nADC; ++i) st+=QString::asprintf("%5.3g",ADCrangeValues_pC[runContent.ADCranges[i]]); ui->textEdit_messages->append(st);
     }
     if(Command::Scanrate    & mask) ui->textEdit_messages->append(QString::asprintf("Exposure time set to %.1f ms", runContent.scanRate * 0.1));
     if(Command::mux_adc     & mask) ui->textEdit_messages->append("Set MUX"     );
@@ -385,7 +308,7 @@ void MainWindow::getRunResponse(Run *resp){
     }
     if(Command::Temperature & mask) {
         QString st="ADCnumber:"; for(auto i = 0; i < nADC; ++i) st+=QString::asprintf("%5u"  ,                           i) ; ui->textEdit_messages->append(st);
-                st="temp., °C:"; for(auto i = 0; i < nADC; ++i) st+=QString::asprintf("%5.3g",runContent.ADCtemperatures[i]); ui->textEdit_messages->append(st);
+        st="temp., °C:"; for(auto i = 0; i < nADC; ++i) st+=QString::asprintf("%5.3g",runContent.ADCtemperatures[i]); ui->textEdit_messages->append(st);
     }
     if(Command::RemainWords & mask) ui->textEdit_messages->append(QString::asprintf("Data FIFO payload: %u 32-bit words", runContent.FIFOpayload));
     runGUIControl(true);
@@ -432,7 +355,7 @@ void MainWindow::selectedFrameChanged(){
     else if(qobject_cast<QSlider*>(sender()) == ui->horizontalSlider && ui->horizontalSlider->value() != currentframeIndex)
         currentframeIndex = ui->horizontalSlider->value();
 
-    updateMap(frames[currentframeIndex], ui->plotMap, colorMap, rMode ? getMapRange(frames) : getMapRange(frames[currentframeIndex]));
+    singleFrameMap->update(frames[currentframeIndex], rMode ? getValueRange(frames) : getValueRange(frames[currentframeIndex]));
 
     ui->horizontalSlider->setValue(currentframeIndex);
 
@@ -440,20 +363,7 @@ void MainWindow::selectedFrameChanged(){
     ui->pushButton_nextFrame->setEnabled(currentframeIndex != frames.size() - 1);
     ui->label_frameNo->setText(QString::asprintf("Frame %d/%d", currentframeIndex + 1, frames.size()));
 
-    updateHisto(frames[currentframeIndex], ui->hist, Bars);
-}
-
-void MainWindow::changeCorrespondingRange(){
-    QCustomPlot* sndr = qobject_cast<QCustomPlot*>(sender());
-    Frame* fr; QCustomPlot* map; QCPColorMap* cmap;
-    if(sndr == ui->hist     ){ fr = &frames[currentframeIndex]; map = ui->plotMap     ; cmap = colorMap    ;}
-    else
-    if(sndr == ui->histMean ){ fr = &meanFrame                ; map = ui->plotMapMean ; cmap = colorMapMean;}
-    else
-    if(sndr == ui->histSigma){ fr = &stdevFrame               ; map = ui->plotMapSigma; cmap = colorMapStd ;}
-    else return;
-
-    updateMap(*fr, map, cmap, sndr->xAxis->range());
+    singleFrameHist->update(frames[currentframeIndex]);
 }
 
 quint16 MainWindow::getUIcommandMask(){
@@ -474,14 +384,6 @@ void MainWindow::disableCalibration(){
     (isDark ? ui->label_Dark : ui->label_Light)->setText("Disabled");
     (isDark ? darkCalibFileName : lightCalibFileName) = "";
     getScanData(lastScanData);
-}
-
-QCPColorGradient getGradient(const QList<QColor> &palette){
-    QCPColorGradient retValue;
-    QMap<double, QColor> map;
-    for(auto i = 0; i < palette.size(); ++i) map.insert(static_cast<double>(i) / palette.size(), palette.at(i));
-    retValue.setColorStops(map);
-    return retValue;
 }
 
 void MainWindow::saveSettings(){
@@ -550,7 +452,7 @@ void MainWindow::updateLightCalib(QString fileName){
     delete sd;
 }
 
-QCPRange MainWindow::getMapRange(QVector<Frame> &frames){
+QCPRange MainWindow::getValueRange(QVector<Frame> &frames){
     float sampleMax = frames.first().max();
     float sampleMin = frames.first().min();
     for(auto &fr : frames){
@@ -560,7 +462,7 @@ QCPRange MainWindow::getMapRange(QVector<Frame> &frames){
     return QCPRange(sampleMin, sampleMax);
 }
 
-QCPRange MainWindow::getMapRange(Frame & frame){
+QCPRange MainWindow::getValueRange(Frame & frame){
     return QCPRange(frame.min(), frame.max());
 }
 

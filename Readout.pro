@@ -10,6 +10,7 @@ CONFIG += c++latest
 
 SOURCES += \
     client.cpp \
+    ctrocplottables.cpp \
     main.cpp \
     mainwindow.cpp \
     proto.cpp \
@@ -17,6 +18,7 @@ SOURCES += \
 
 HEADERS += \
     client.h \
+    ctrocplottables.h \
     mainwindow.h \
     palettes.h \
     proto.h \

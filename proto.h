@@ -26,29 +26,29 @@ const quint32   bitNo_Status      =  0, Status      = (1 << bitNo_Status     ),
                 bitNo_ReadStream  = 13, ReadStream  = (1 << bitNo_ReadStream ),
                 bitNo_Temperature = 14, Temperature = (1 << bitNo_Temperature),
                 bitNo_RemainWords = 15, RemainWords = (1 << bitNo_RemainWords),
-                bitNo_drive_on    = 16, drive_on    = (1 << bitNo_drive_on),
-                bitNo_drive_off   = 17, drive_off   = (1 << bitNo_drive_off);
+                bitNo_drive_on    = 16, drive_on    = (1 << bitNo_drive_on   ),
+                bitNo_drive_off   = 17, drive_off   = (1 << bitNo_drive_off  );
 };
 
 const QStringList COMMANDS ={
-    "status"        ,// 0
-    "comptime"      ,// 1
-    "nlines"        ,// 2
-    "adc_range"     ,// 3
-    "scanrate"      ,// 4
-    "mux_adc"       ,// 5
-    "scan_mode"     ,// 6
-    "kadr_off"      ,// 7
-    "msg_after"     ,// 8
-    "reset"         ,// 9
-    "offset"        ,//10
-    "drift"         ,//11
-    "kadr_on"       ,//12
-    "read_stream"   ,//13
-    "temp"          ,//14
-    "words_after"   ,//15
-    "drive_on"      ,//16
-    "drive_off"      //17
+    "status"              ,// 0
+    "comptime"            ,// 1
+    "nlines"              ,// 2
+    "adc_range"           ,// 3
+    "scanrate"            ,// 4
+    "mux_adc"             ,// 5
+    "scan_mode"           ,// 6
+    "kadr_off"            ,// 7
+    "msg_after"           ,// 8
+    "ipbus_timeout; reset",// 9
+    "offset"              ,//10
+    "drift"               ,//11
+    "kadr_on"             ,//12
+    "read_stream"         ,//13
+    "temp"                ,//14
+    "words_after"         ,//15
+    "drive_on"            ,//16
+    "drive_off"            //17
 };
 
 const int nADCmax = 16;

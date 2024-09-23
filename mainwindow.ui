@@ -507,6 +507,9 @@ color: rgb(170, 0, 255);</string>
             <property name="text">
              <string>Status</string>
             </property>
+            <property name="flat">
+             <bool>false</bool>
+            </property>
            </widget>
           </item>
           <item row="0" column="1">
@@ -1370,6 +1373,13 @@ color: rgb(170, 0, 255);</string>
          </widget>
         </widget>
        </item>
+       <item>
+        <widget class="QCheckBox" name="checkBox_logScale">
+         <property name="text">
+          <string>Log Scale</string>
+         </property>
+        </widget>
+       </item>
       </layout>
      </widget>
     </item>
@@ -1497,6 +1507,34 @@ color: rgb(170, 0, 255);</string>
          </layout>
         </widget>
        </item>
+       <item row="0" column="2">
+        <widget class="QPushButton" name="pushButton_play">
+         <property name="minimumSize">
+          <size>
+           <width>24</width>
+           <height>24</height>
+          </size>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>24</width>
+           <height>24</height>
+          </size>
+         </property>
+         <property name="font">
+          <font>
+           <pointsize>12</pointsize>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="text">
+          <string>▶</string>
+         </property>
+         <property name="checkable">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
        <item row="0" column="1">
         <widget class="QLabel" name="label_frameNo">
          <property name="sizePolicy">
@@ -1525,7 +1563,7 @@ color: rgb(170, 0, 255);</string>
          </property>
         </widget>
        </item>
-       <item row="1" column="0" colspan="4">
+       <item row="1" column="0" colspan="5">
         <widget class="QSlider" name="horizontalSlider">
          <property name="enabled">
           <bool>false</bool>
@@ -1553,7 +1591,7 @@ color: rgb(170, 0, 255);</string>
          </property>
         </widget>
        </item>
-       <item row="0" column="3">
+       <item row="0" column="4">
         <widget class="QPushButton" name="pushButton_rangeMode">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
@@ -1584,8 +1622,8 @@ color: rgb(170, 0, 255);</string>
          </property>
         </widget>
        </item>
-       <item row="0" column="2">
-        <widget class="QPushButton" name="pushButton_play">
+       <item row="0" column="3">
+        <widget class="QPushButton" name="pushButton_repeat">
          <property name="minimumSize">
           <size>
            <width>24</width>
@@ -1600,12 +1638,12 @@ color: rgb(170, 0, 255);</string>
          </property>
          <property name="font">
           <font>
-           <pointsize>12</pointsize>
-           <bold>true</bold>
+           <pointsize>15</pointsize>
+           <stylestrategy>NoAntialias</stylestrategy>
           </font>
          </property>
          <property name="text">
-          <string>▶</string>
+          <string>🔁</string>
          </property>
          <property name="checkable">
           <bool>true</bool>
