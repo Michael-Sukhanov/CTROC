@@ -19,6 +19,10 @@ public:
     FrameMap(QCustomPlot *&_plot);
     void update(Frame &frame, const QCPRange range);
     void update(const QCPRange range);
+    void saveImg(QMouseEvent *ev);
+
+    void hideInfo();
+    void showInfo();
 
 private:
     QCustomPlot *plot;
@@ -26,6 +30,9 @@ private:
     QCPColorScale *scale;
     TextInfo *text;
     QCPItemRect *pixel;
+
+    void setSelectedPixel(QMouseEvent* ev);
+    void mouseEventFilter(QMouseEvent* ev, QCPAbstractItem* item = nullptr);
 };
 
 class FrameHist : public QObject

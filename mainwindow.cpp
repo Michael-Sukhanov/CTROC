@@ -76,6 +76,7 @@ MainWindow::MainWindow(QWidget *parent)
             if(el->text().isEmpty())cb->setChecked(false);
             cb->setEnabled(!el->text().isEmpty());
             pb->setEnabled(!el->text().isEmpty());
+
         });
     }
     for(auto &el : lineEditsList){el->textEdited(el->text());}
@@ -85,6 +86,7 @@ MainWindow::MainWindow(QWidget *parent)
     for(auto &el : pushButtonsList){
         auto elCommand = getCorrespondingCommand(el);
         el->setText(COMMANDS[getCorrespondingBitNo(el)]);
+        el->setStyleSheet("QPushButton { margin: -1px }");
         connect(el, &QPushButton::clicked, this, [=, this](){
             QLineEdit* le = this->findChild<QLineEdit*>("lineEdit_com_" + el->objectName().mid(el->objectName().lastIndexOf("_")+1));
             Tcpclient->sendRunCommand(getCorrespondingCommand(el),
@@ -103,6 +105,7 @@ MainWindow::MainWindow(QWidget *parent)
         Tcpclient->sendRunCommand(checked ? Command::drive_on : Command::drive_off, "", "", "");
         ui->pushButton_drive->setText(checked ? "drive_off" : "drive_on");
     });
+    ui->pushButton_drive->setStyleSheet("QPushButton { margin: -1px }");
 
     //обработка поведения check-boxов
     QList<QCheckBox*> checkBoxes = this->findChildren<QCheckBox*>(QRegularExpression("checkBox_[0-9]+"));
@@ -111,11 +114,6 @@ MainWindow::MainWindow(QWidget *parent)
     singleFrameMap = new FrameMap(ui->plotMap);
     meanFrameMap   = new FrameMap(ui->plotMapMean);
     stdevFrameMap  = new FrameMap(ui->plotMapSigma);
-
-    connect(ui->plotMap     , &QCustomPlot::plottableClick, this, &MainWindow::saveImage);
-    connect(ui->plotMapMean , &QCustomPlot::plottableClick, this, &MainWindow::saveImage);
-    connect(ui->plotMapSigma, &QCustomPlot::plottableClick, this, &MainWindow::saveImage);
-
 
     singleFrameHist = new FrameHist(ui->hist     , singleFrameMap);
     meanFrameHist   = new FrameHist(ui->histMean , meanFrameMap  );
@@ -212,7 +210,7 @@ MainWindow::~MainWindow(){
 void MainWindow::getRawFrames(ScanData *response, QVector<Frame> &vec){
     vec.clear();
     frames.reserve(response->getFramesCount());
-    for(auto i = 0; i < response->getFramesCount(); ++i){
+    for(quint32 i = 0; i < response->getFramesCount(); ++i){
         vec.append(Frame(response, i));
     }
 }
@@ -318,33 +316,6 @@ void MainWindow::sendRunCommand(){
     quint16 msk = getUIcommandMask();
     if(msk) Tcpclient->sendRunCommand(msk, ADCRangeLE->text(), setRateLE->text(), readStreamLE->text());
     runGUIControl(false);
-}
-
-void MainWindow::saveImage(QCPAbstractPlottable *  plottable, int  dataIndex, QMouseEvent* evnt){
-    Q_UNUSED(plottable)
-    Q_UNUSED(dataIndex)
-
-    if(evnt->button() != Qt::RightButton) return;
-    QMenu* menu = new QMenu(this);
-    QAction *pdfSave = menu->addAction("Save");
-    QAction *saveAs = menu->addAction("Save as...");
-
-
-    QCustomPlot* plotObj = qobject_cast<QCustomPlot*>(sender());
-
-
-    connect(pdfSave, &QAction::triggered, this, [=](bool trig){plotObj->savePdf(QDateTime::currentDateTime().toString("yyMMddHHmmss") + ".pdf");}, Qt::ConnectionType::UniqueConnection);
-    connect(saveAs, &QAction::triggered, this, [=](bool trig){
-        QString fileName = QFileDialog::getSaveFileName(this, tr("Save image"), QDateTime::currentDateTime().toString("yyMMddHHmmss"), tr("*.png;;*.jpg;;*.bmp;;*.pdf;;*.dat"));
-        if(fileName.isEmpty()) return;
-        QString format = fileName.split(".").last();
-        if(format == "jpg") plotObj->saveJpg(fileName);
-        if(format == "bmp") plotObj->saveBmp(fileName);
-        if(format == "png") plotObj->savePng(fileName);
-        if(format == "pdf") plotObj->savePdf(fileName);
-    });
-    menu->popup(evnt->globalPos());
-
 }
 
 void MainWindow::selectedFrameChanged(){
