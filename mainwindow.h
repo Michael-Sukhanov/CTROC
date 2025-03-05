@@ -69,8 +69,8 @@ private:
 
     QMessageBox msgBox;
 
-    //используется для отображения, сохранения и загрузки данных с последнего скана
-    ScanData *lastScanData;
+    //используется для отображения, сохранения и загрузки данных с последнего скана и из файла
+    ScanData *lastScanData, *fileScanData;
 
     //функция получения калибровочных фреймов
     Frame getDarkFrame(ScanData*);
@@ -91,7 +91,6 @@ private slots:
     void getScanData (ScanData  *);
     void getRunResponse(Run     *);
     void sendRunCommand();
-    void saveImage(QCPAbstractPlottable *  plottable, int  dataIndex, QMouseEvent* evnt);
 
     void selectedFrameChanged();
     quint16 getUIcommandMask();

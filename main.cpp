@@ -9,7 +9,6 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationName("INR");
 
     QApplication a(argc, argv);
-    a.setStyleSheet("QPushButton { margin: -1px }");
     MainWindow w;
     w.setWindowTitle("CTROC");
     w.show();

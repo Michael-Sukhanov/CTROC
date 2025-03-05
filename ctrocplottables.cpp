@@ -18,8 +18,9 @@ FrameMap::FrameMap(QCustomPlot *&_plot):plot(_plot){
     scale->setType(QCPAxis::atRight);
     scale->axis()->setTickLengthOut(scale->axis()->tickLengthIn()/2);
     scale->axis()->setSubTickLengthOut(scale->axis()->subTickLengthIn()/2);
-    scale->axis()->setNumberFormat("eb");
-    scale->axis()->setNumberPrecision(0);
+    scale->axis()->setNumberFormat("g");
+    scale->axis()->setTickLabelFont(QFont("Consolas", 8));
+    scale->axis()->setNumberPrecision(5);
 
     map->setColorScale(scale);
     map->setGradient(getGradient(kDarkBodyRadiator));
@@ -30,31 +31,23 @@ FrameMap::FrameMap(QCustomPlot *&_plot):plot(_plot){
     scale->setRangeDrag(false);
     scale->setRangeZoom(false);
 
-    text = new TextInfo(plot);
 
     pixel = new QCPItemRect(plot);
     pixel->topLeft->setType(QCPItemPosition::ptAxisRectRatio);
     pixel->bottomRight->setType(QCPItemPosition::ptAxisRectRatio);
 
     pixel->setBrush(QBrush(QColor(0,255,0, 255)));
+
+    text = new TextInfo(plot);
 //    pixel->topLeft->setAxes( plot->axisRect()->axis(QCPAxis::atBottom),
 //                           plot->axisRect()->axis(QCPAxis::atLeft));
 //    pixel->bottomRight->setAxes(plot->axisRect()->axis(QCPAxis::atBottom),
 //                               plot->axisRect()->axis(QCPAxis::atLeft));
     pixel->setVisible(false);
 
-    connect(plot, &QCustomPlot::plottableClick, this, [=](QCPAbstractPlottable* ap,int idx,QMouseEvent* ev){
-        double x, y;
-        map->pixelsToCoords(ev->pos(), x, y);
-        int ix = static_cast<int>(x), iy = static_cast<int>(y);
-        text->setText(QString("{%1, %2} : %3").arg(ix).arg(iy).arg(map->data()->data(x, y)));
-        text->setVisible(true);
-
-        pixel->topLeft->setCoords(ix/plot->xAxis->range().upper, iy/plot->yAxis->range().upper);
-        pixel->bottomRight->setCoords((ix+1)/plot->xAxis->range().upper, (iy+ 1)/plot->yAxis->range().upper);
-        pixel->setVisible(true);
-        plot->replot();
-    });
+    connect(plot, &QCustomPlot::itemClick,      this, [=, this](QCPAbstractItem* item, QMouseEvent* ev){mouseEventFilter(ev, item);});
+    connect(plot, &QCustomPlot::axisClick,      this, [=, this](QCPAxis* axis, QCPAxis::SelectablePart p, QMouseEvent* ev){mouseEventFilter(ev);});
+    connect(plot, &QCustomPlot::plottableClick, this, [=, this](QCPAbstractPlottable* ap,int idx,QMouseEvent* ev){mouseEventFilter(ev);});
 }
 
 
@@ -77,6 +70,57 @@ void FrameMap::update(Frame &frame, const QCPRange range){
 void FrameMap::update(const QCPRange range){
     map->setDataRange(range);
     plot->replot();
+}
+
+void FrameMap::saveImg(QMouseEvent* ev){
+    QMenu* menu = new QMenu(plot);
+    QAction *pdfSave = menu->addAction("Save");
+    QAction *saveAs = menu->addAction("Save as...");
+
+    connect(pdfSave, &QAction::triggered, this, [=, this](bool trig){
+            hideInfo();
+            plot->savePdf(QDateTime::currentDateTime().toString("yyMMddHHmmss") + ".pdf");
+            showInfo();
+        }, Qt::ConnectionType::UniqueConnection);
+    connect(saveAs,  &QAction::triggered, this, [=, this](bool trig){
+        QString fileName = QFileDialog::getSaveFileName(plot, tr("Save image"), QDateTime::currentDateTime().toString("yyMMddHHmmss"), tr("*.png;;*.jpg;;*.bmp;;*.pdf;;*.dat"));
+        if(fileName.isEmpty()) return;
+        QString format = fileName.split(".").last();
+
+        hideInfo();
+        if(format == "jpg") plot->saveJpg(fileName);
+        if(format == "bmp") plot->saveBmp(fileName);
+        if(format == "png") plot->savePng(fileName);
+        if(format == "pdf") plot->savePdf(fileName);
+        showInfo();
+
+    });
+    menu->popup(ev->globalPos());
+
+}
+
+void FrameMap::hideInfo(){this->pixel->setVisible(false); this->text->setVisible(false);}
+void FrameMap::showInfo(){this->pixel->setVisible(true ); this->text->setVisible(true );}
+
+void FrameMap::setSelectedPixel(QMouseEvent *ev){
+    double x, y;
+    map->pixelsToCoords(ev->pos(), x, y);
+    //qDebug() << x << '\t' << y;
+    int ix = static_cast<int>(x), iy = static_cast<int>(y);
+    if(ix >= map->data()->keySize() || iy >= map->data()->valueSize()) return;
+    text->setText(QString("{%1, %2} : %3").arg(ix).arg(iy).arg(map->data()->data(x, y)));
+    text->setVisible(true);
+
+    pixel->topLeft->setCoords(ix/plot->xAxis->range().upper, iy/plot->yAxis->range().upper);
+    pixel->bottomRight->setCoords((ix+1)/plot->xAxis->range().upper, (iy+ 1)/plot->yAxis->range().upper);
+    pixel->setVisible(true);
+    plot->replot();
+}
+
+void FrameMap::mouseEventFilter(QMouseEvent *ev, QCPAbstractItem *item){
+    if(item != text && item != pixel && item) return;
+    if(ev->button() == Qt::LeftButton) setSelectedPixel(ev);
+    if(ev->button() == Qt::RightButton) saveImg(ev);
 }
 
 QCPColorGradient getGradient(const QList<QColor> &palette){

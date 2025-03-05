@@ -31,24 +31,24 @@ const quint32   bitNo_Status      =  0, Status      = (1 << bitNo_Status     ),
 };
 
 const QStringList COMMANDS ={
-    "status"              ,// 0
-    "comptime"            ,// 1
-    "nlines"              ,// 2
-    "adc_range"           ,// 3
-    "scanrate"            ,// 4
-    "mux_adc"             ,// 5
-    "scan_mode"           ,// 6
-    "kadr_off"            ,// 7
-    "msg_after"           ,// 8
-    "ipbus_timeout; reset",// 9
-    "offset"              ,//10
-    "drift"               ,//11
-    "kadr_on"             ,//12
-    "read_stream"         ,//13
-    "temp"                ,//14
-    "words_after"         ,//15
-    "drive_on"            ,//16
-    "drive_off"            //17
+    "status"                    ,// 0
+    "comptime"                  ,// 1
+    "nlines"                    ,// 2
+    "adc_range"                 ,// 3
+    "ipbus_timeout; scanrate"   ,// 4
+    "mux_adc"                   ,// 5
+    "scan_mode"                 ,// 6
+    "kadr_off"                  ,// 7
+    "msg_after"                 ,// 8
+    "reset"                     ,// 9
+    "offset"                    ,//10
+    "drift"                     ,//11
+    "kadr_on"                   ,//12
+    "read_stream"               ,//13
+    "temp"                      ,//14
+    "words_after"               ,//15
+    "drive_on"                  ,//16
+    "drive_off"                  //17
 };
 
 const int nADCmax = 16;
@@ -60,6 +60,7 @@ class Response{
 public:
     Response(QByteArray &_ba);
     Response(QString fileName);
+    Response(const Response &other);
     ~Response();
 
     float   getVersion() const;
@@ -121,6 +122,7 @@ class ScanData : public Response{
 public:
     ScanData(QByteArray &_ba);
     ScanData(QString fileName);
+    ScanData(const ScanData &other);
     ~ScanData();
 
     quint8  getBytesPerPixel() const;
