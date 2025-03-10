@@ -40,10 +40,10 @@ void Response::_Response(QByteArray &_ba){
 
     preambleList = preamble.split("\r\n", Qt::SkipEmptyParts);
     for(auto &el : preambleList){
-        if(-1 != QRegExp("PROTO*").indexIn(el))
-            sscanf_s(el.toStdString().c_str(), "PROTO/%f %d", &version, &status);
-        if(-1 != QRegExp("Content-Length*").indexIn(el)){
-            sscanf_s(el.toStdString().c_str(), "Content-Length: %u", &contentLength);
+        if(QRegularExpression("PROTO*").globalMatch(el).hasNext())
+            sscanf(el.toStdString().c_str(), "PROTO/%f %d", &version, &status);
+        if(QRegularExpression("Content-Length*").globalMatch(el).hasNext()){
+            sscanf(el.toStdString().c_str(), "Content-Length: %u", &contentLength);
             data = new char[contentLength];
             appendData(dataPart);
         }
@@ -77,13 +77,13 @@ void Response::storePacket(QString fname){
 
 MetaInfo::MetaInfo(QByteArray &_ba):Response(_ba){
     for(auto &el : preambleList){
-        // if(-1 != QRegExp("Person-Name:*").indexIn(el)){
+        // if(QRegularExpression("Person-Name:*").globalMatch().hasNext()){
         //     std::string s1, s2, s3;
-        //     sscanf_s(el.toStdString().c_str(), "Person-Name: %s %s %s", &s1, &s2, &s3);
+        //     sscanf(el.toStdString().c_str(), "Person-Name: %s %s %s", &s1, &s2, &s3);
         //     name = QString::fromStdString(s1) + " " + QString::fromStdString(s2) + QString::fromStdString(s3);
         // }
-        if(-1 != QRegExp("Person-Age:*").indexIn(el))
-            sscanf_s(el.toStdString().c_str(), "Person-Age: %u", &age);
+        if(QRegularExpression("Person-Age:*").globalMatch(el).hasNext())
+            sscanf(el.toStdString().c_str(), "Person-Age: %u", &age);
     }
 }
 
@@ -94,13 +94,13 @@ quint8  MetaInfo::getAge() const {return age; }
 
 ScanState::ScanState(QByteArray &_ba):Response(_ba){
     for(auto &el : preambleList){
-        if(-1 != QRegExp("In-Progress*").indexIn(el)){
+        if(QRegularExpression("In-Progress*").globalMatch(el).hasNext()){
             std::string s;
-            sscanf_s(el.toStdString().c_str(), "In-progress: %s", &s);
+            sscanf(el.toStdString().c_str(), "In-progress: %s", &s);
             inProgress = s == "yes";
         }
-        if(-1 != QRegExp("Complete-Frames*").indexIn(el))
-            sscanf_s(el.toStdString().c_str(), "Complete-Frames: %u", &completeFrames);
+        if(QRegularExpression("Complete-Frames*").globalMatch(el).hasNext())
+            sscanf(el.toStdString().c_str(), "Complete-Frames: %u", &completeFrames);
     }
     qDebug() << inProgress << completeFrames;
 }
@@ -128,59 +128,89 @@ void ScanData::_ScanData(){
     framesCount = contentLength/ (bytesPerPixel * sizeX * sizeZ + 32); //по умолчанию, если не известно реальное количество фреймов
     for(const auto &el : preambleList){
         if(-1 != el.indexOf("Bytes-Per-Pixel:"))
-            sscanf_s(el.toStdString().c_str(), "Bytes-Per-Pixel: %u", &bytesPerPixel);
+            sscanf(el.toStdString().c_str(), "Bytes-Per-Pixel: %u", &bytesPerPixel);
         else if(-1 != el.indexOf("Matrix-Size-X:"))
-            sscanf_s(el.toStdString().c_str(), "Matrix-Size-X: %u", &sizeX);
+            sscanf(el.toStdString().c_str(), "Matrix-Size-X: %u", &sizeX);
         else if(-1 != el.indexOf("Matrix-Size-Z:")){
-            sscanf_s(el.toStdString().c_str(), "Matrix-Size-Z: %u", &sizeZ);}
+            sscanf(el.toStdString().c_str(), "Matrix-Size-Z: %u", &sizeZ);}
         else if(-1 != el.indexOf("Frames-Per-Loop:")){
-            sscanf_s(el.toStdString().c_str(), "Frames-Per-Loop: %u", &framesPerLoop);}
+            sscanf(el.toStdString().c_str(), "Frames-Per-Loop: %u", &framesPerLoop);}
         else if(-1 != el.indexOf("Loop-Number:")){
-            sscanf_s(el.toStdString().c_str(), "Loop-Number: %u", &loopNumber);}
+            sscanf(el.toStdString().c_str(), "Loop-Number: %u", &loopNumber);}
         else if(-1 != el.indexOf("First-Frame:")){
-            sscanf_s(el.toStdString().c_str(), "First-Frame: %u", &firstFrame);}
+            sscanf(el.toStdString().c_str(), "First-Frame: %u", &firstFrame);}
         else if(-1 != el.indexOf("Frames-Count:")){
-            sscanf_s(el.toStdString().c_str(), "Frames-Count: %u", &framesCount);}
+            sscanf(el.toStdString().c_str(), "Frames-Count: %u", &framesCount);}
     }
 }
 
 
 
-Frame::Frame(ScanData *sd, quint32 frameNo):fp(FrameSINGL), empty(false){
+// Frame::Frame(quint16 _sizeX, quint16 _sizeZ):bpp(2),
+//     sizeX(_sizeX),sizeZ(_sizeZ),empty(true)
+// {
+
+// }
+
+Frame::Frame(ScanData *sd, quint32 frameNo):purpose(FrameSINGL), empty(sd != nullptr){
+    if(!sd) return;
     bpp = sd->getBytesPerPixel(), sizeX = sd->getSizeX(), sizeZ = sd->getSizeZ();
     quint32 step = bpp * sizeX * sizeZ + 32;
     header = *reinterpret_cast<FrameHeader*>(sd->getData() + frameNo * step);
-    for(auto i = 0; i < sizeX * sizeZ; ++i)
-        data[i] = *reinterpret_cast<quint16*>(sd->getData() + frameNo * step + 32 + i * bpp);
-    // bpp = sd->getBytesPerPixel();
+    for(auto i = 0; i < sizeX * sizeZ; ++i) data[i] = *reinterpret_cast<quint16*>(sd->getData() + frameNo * step + sizeof(FrameHeader) + i * bpp);
 }
 
-Frame::Frame(QVector<Frame>::iterator start, QVector<Frame>::iterator stop, FramePurpose purpose, Frame* mean, quint16 _sX, quint16 _sZ):bpp(2),sizeX(_sX),sizeZ(_sZ),fp(purpose), empty(false){
-    quint32 nFrames = stop - start;
-    if(purpose == FrameMEAN || purpose == FrameDARK){
-        for(auto k = 0; k < sizeX * sizeZ; k++){
-            double mnVal = 0;
-            for(auto i = start; i != stop; ++i){
-                mnVal += (*i)(k / sizeX, k % sizeX);
+Frame::Frame(QVector<Frame>::iterator start, QVector<Frame>::iterator stop, FramePurpose purpose, quint16 _sX, quint16 _sZ):sizeX(_sX),sizeZ(_sZ),bpp(2),purpose(purpose), empty(start == stop){
+    if(empty) return;
+    quint32 framesAmount = stop - start;
+    //высчитываем значение для каждого пикселя
+    for(auto k = 0; k < sizeX * sizeZ; k++){
+        float sum = 0, squaresSum = 0;
+        for(auto it = start; it != stop; ++it) sum += it->at(k / sizeX, k % sizeX);
+        float _mean = sum / framesAmount;
+        for(auto it = start; it != stop; ++it) squaresSum += std::pow(it->at(k / sizeX, k % sizeX) - _mean, 2);
+        float _stdev = std::sqrt(squaresSum / (framesAmount - 1));
+
+        switch (purpose) {
+        //case FrameDARK:
+        case FrameMEAN:
+            //среднее по пикселю
+            {data[k] = _mean; break;}
+        case FrameSTDEV:
+            //стандартное отклонение по пикселю
+            {data[k] = _stdev; break;}
+        case FrameDARK:{
+            bool ejectionCorrection = true;
+            std::set<float*> ejectedElements;
+            while(ejectionCorrection){
+                ejectionCorrection = false;
+                for(auto it = start; it != stop; ++it){
+                    if(ejectedElements.find(it->data + k) != ejectedElements.end()) continue;
+                    float grubbs = (it->data[k] - _mean) / _stdev;
+                    //qDebug() << it->data[k] << _mean << _stdev;
+                    if(grubbs > 5.){
+                        qDebug() << grubbs;
+                        ejectedElements.insert(it->data + k);
+                        ejectionCorrection = true;
+                        sum -= it->data[k];
+                        squaresSum -= std::pow(it->data[k]*it->data[k] - _mean, 2);
+                    }
+                    _mean = sum / (framesAmount - ejectedElements.size());
+                    _stdev = std::sqrt(squaresSum / (framesAmount - ejectedElements.size() - 1));
+                }
             }
-            data[k] = mnVal / nFrames;
+            data[k] = _mean;
+            break;
         }
-    }
-    if(purpose == FrameSTDEV && nFrames>1) {
-        Frame *mn = mean;
-        if(!mn) mn = new Frame(start, stop, FrameMEAN);
-        for(auto k = 0; k < sizeX * sizeZ; k++){
-            double stdVal = 0;
-            for(auto i = start; i != stop; ++i){
-                stdVal += std::pow((*i)(k / sizeX, k % sizeX) - (*mn)(k / sizeX, k % sizeX), 2);
-            }
-            data[k] = std::sqrt(stdVal / (nFrames - 1));
+        default:
+            break;
         }
-        if(mn && (mn != mean)) delete mn;
+
     }
+
 }
 
-Frame::Frame(FramePurpose purpose, QString fileName, quint16 _sX, quint16 _sZ):bpp(2),sizeX(_sX),sizeZ(_sZ),fp(purpose){
+Frame::Frame(FramePurpose purpose, QString fileName, quint16 _sX, quint16 _sZ):sizeX(_sX),sizeZ(_sZ),bpp(2),purpose(purpose){
     quint32 sz = sizeX * sizeZ;
     if(QFile::exists(fileName)){
         QFile input(fileName);
@@ -189,14 +219,13 @@ Frame::Frame(FramePurpose purpose, QString fileName, quint16 _sX, quint16 _sZ):b
         input.close();
         empty = false;
     }else{
-        if(purpose == FrameDARK){
-            for(auto i = 0; i < sizeX*sizeZ; ++i) data[i] = 0.0;;
-        }else if(purpose == FrameLIGHT){ for(auto i = 0; i < sizeX*sizeZ; ++i) data[i] = 1.0;}
+        if(purpose == FrameDARK) for(auto i = 0; i < sizeX*sizeZ; ++i) data[i] = 0.0;
+        else if(purpose == FrameLIGHT) for(auto i = 0; i < sizeX*sizeZ; ++i) data[i] = 1.0;
         empty = true;
     }
 }
 
-Frame::Frame(const Frame &fr):header(fr.header),bpp(fr.bpp),sizeX(fr.sizeX),sizeZ(fr.sizeZ),fp(fr.fp),_max(fr._max),_min(fr._min),_mean(fr._mean), empty(fr.empty){
+Frame::Frame(const Frame &fr):header(fr.header),bpp(fr.bpp),sizeX(fr.sizeX),sizeZ(fr.sizeZ),purpose(fr.purpose),_max(fr._max),_min(fr._min),_mean(fr._mean), empty(fr.empty){
     memcpy(data, fr.data, fr.sizeX * fr.sizeZ * sizeof(float));
 }
 
@@ -241,7 +270,7 @@ float Frame::mean(){
 }
 
 void Frame::show(){
-    if(fp == FrameSINGL) qDebug() << header.pixels_in_frame << header.frame_flags0 << header.frame_flags1;
+    if(purpose == FrameSINGL) qDebug() << header.pixels_in_frame << header.frame_flags0 << header.frame_flags1;
     for(auto z = 0; z <sizeZ; ++z)
         for(auto x = 0; x < sizeX; ++x)
             qDebug() << (*this)(z, x);
@@ -271,7 +300,7 @@ void RunContent::update(Run *r){
     for(auto &el : list){
         auto idxOfThisEl = list.indexOf(el);
         if(-1 != el.indexOf("Total ADC lines")){
-            maskUpdated |= Command::Nlines; sscanf_s(el.toStdString().c_str(), "Total ADC lines: %d", &numLines);
+            maskUpdated |= Command::Nlines; sscanf(el.toStdString().c_str(), "Total ADC lines: %d", &numLines);
         }
         if(-1 != el.indexOf("ADC drift correction ON")){
             maskUpdated |= Command::Drift;
@@ -306,39 +335,39 @@ void RunContent::update(Run *r){
         if(-1 != el.indexOf("bit file compilation")){
             maskUpdated |= Command::CompileTime;
             quint32 Y, M, D, h, m, s;
-            sscanf_s(el.toStdString().c_str(), "bit file compilation date/time: %u-%u-%u / %u:%u:%u", &Y, &M, &D, &h, &m, &s);
+            sscanf(el.toStdString().c_str(), "bit file compilation date/time: %u-%u-%u / %u:%u:%u", &Y, &M, &D, &h, &m, &s);
             compilationDateTime.setTime(QTime(h,m,s));
             compilationDateTime.setDate(QDate(Y + 2000, M, D));
         }
         if(-1 != el.indexOf("Send STATUS")) maskUpdated |= Command::Status;
         if(-1 != el.indexOf("Set ADC range")){
             maskUpdated |= Command::ADCrange;
-            for(auto i = 0; i < nADC; ++i) ADCranges[i] = list[idxOfThisEl + i + 1].rightRef(1).toUInt();
+            for(auto i = 0; i < nADC; ++i) ADCranges[i] = list[idxOfThisEl + i + 1].right(1).toUInt();
         }
         if(-1 != el.indexOf("Set scan rate")){
             maskUpdated |= Command::Scanrate;
             int brackLeft = list[idxOfThisEl + 1].indexOf("(") + 1;
-            scanRate = list[idxOfThisEl + 1].midRef(brackLeft, list[idxOfThisEl + 1].indexOf(")") - brackLeft).toUInt();
+            scanRate = list[idxOfThisEl + 1].mid(brackLeft, list[idxOfThisEl + 1].indexOf(")") - brackLeft).toUInt();
         }
         if(-1 != el.indexOf("Set CONV on")) maskUpdated |= Command::ScanMode;
         if(-1 != el.indexOf("left in FIFO after ADC data read")){
             maskUpdated |= Command::RemainWords;
-            sscanf_s(el.toStdString().c_str(), "%u data words left in FIFO after data read", &FIFOpayload);
+            sscanf(el.toStdString().c_str(), "%u data words left in FIFO after data read", &FIFOpayload);
         }
         if(-1 != el.indexOf("Messages during readout:")){
             maskUpdated |= Command::EndMessage;
             if(list[idxOfThisEl + 1] == "no messages" || list[idxOfThisEl + 1] == ""){ MSGpayload = 0; continue;}
-            sscanf_s(list[idxOfThisEl + 1].toStdString().c_str(), "MSG FIFO payload count: %u (32-bit words)", &MSGpayload);
+            sscanf(list[idxOfThisEl + 1].toStdString().c_str(), "MSG FIFO payload count: %u (32-bit words)", &MSGpayload);
         }
         if(-1 != el.indexOf("Loop for reading")){
             maskUpdated |= Command::ReadStream;
-            sscanf_s(el.toStdString().c_str(), "Loop for reading %u frames (%u IPBus reads) begin", &tryReadNFrames, &ipbusReads);
+            sscanf(el.toStdString().c_str(), "Loop for reading %u frames (%u IPBus reads) begin", &tryReadNFrames, &ipbusReads);
             if(-1 != list[idxOfThisEl + 1].indexOf("ERROR")){
                 if(list[idxOfThisEl + 1] == "ERROR: Break read Reg 0x101 loop after 100 times read zero") readerrCode = 1;
                 else readerrCode = 2;
             }else if(-1 != list[idxOfThisEl + 2].indexOf("DATA FIFO read")){
                 int tmp;
-                sscanf_s(list[idxOfThisEl + 2].toStdString().c_str(), "DATA FIFO read %u times, all %u frames collected", &tmp, &framesCollected);
+                sscanf(list[idxOfThisEl + 2].toStdString().c_str(), "DATA FIFO read %u times, all %u frames collected", &tmp, &framesCollected);
                 readerrCode = 0;
             }
         }

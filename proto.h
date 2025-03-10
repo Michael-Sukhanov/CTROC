@@ -8,6 +8,8 @@
 #include <iostream>
 #include <fstream>
 #include <QFile>
+#include <QRegularExpression>
+#include <set>
 
 namespace Command{
 const quint32   bitNo_Status      =  0, Status      = (1 << bitNo_Status     ),
@@ -52,6 +54,8 @@ const QStringList COMMANDS ={
 };
 
 const int nADCmax = 16;
+const unsigned TILE_WIDTH  = 8;
+const unsigned TILE_HEIGHT = 32;
 extern quint8 nADC;
 
 QString makeCommand(quint32 commandPipeline, QString ranges, QString scanRate, QString readNum);
@@ -177,29 +181,31 @@ enum FramePurpose{
 };
 
 struct Frame{
-    FrameHeader header;
-    float data[nADCmax*8*32] = {0.};
-    quint8 bpp;
-    quint16 sizeX, sizeZ;
-    FramePurpose fp;
+    quint16 sizeX = TILE_WIDTH, sizeZ = TILE_HEIGHT;
+    quint8 bpp = 2;
+    float data[nADCmax * TILE_WIDTH * TILE_HEIGHT] = {0.};
+    FramePurpose purpose = FrameSINGL;
     float _max = -1, _min = -1, _mean = -1;
-    bool empty;
+    bool empty = true;
+    FrameHeader header;
 
+    //Frame(quint16 _sizeX = 8 * nADC, quint16 _sizeZ = 32);
     Frame(ScanData* sd, quint32 frameNo);
-    Frame(QVector<Frame>::iterator start, QVector<Frame>::iterator stop, FramePurpose purpose = FrameMEAN, Frame* mean = nullptr, quint16 _sX = 8*nADC, quint16 _sZ = 32);
+    Frame(QVector<Frame>::iterator start, QVector<Frame>::iterator stop, FramePurpose purpose = FrameMEAN, quint16 _sX = 8*nADC, quint16 _sZ = 32);
     Frame(FramePurpose purpose = FrameDARK, QString fileName = "", quint16 _sX = 8*nADC, quint16 _sZ = 32);
     Frame(const Frame &fr);
 
     float& operator()(int z, int x){
         return data[x + z * sizeX];
     }
+    float& at(int z, int x){return (*this)(z, x);}
     Frame& operator=(const Frame &other){
         header = other.header;
         memcpy(data, other.data, other.sizeX * other.sizeZ * sizeof(float));
         bpp = other.bpp;
         sizeX = other.sizeX;
         sizeZ = other.sizeZ;
-        fp = other.fp;
+        purpose = other.purpose;
         _max = other._max;
         _min = other._min;
         _mean = other._mean;
@@ -213,6 +219,8 @@ struct Frame{
     float min();
     float mean();
     void show();
+
+    //float rightGgrobbs(QVector<Frame>::iterator start)
 };
 
 struct RunContent{
