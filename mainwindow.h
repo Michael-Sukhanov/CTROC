@@ -8,6 +8,7 @@
 #include <palettes.h>
 #include <QSettings>
 #include <QTimer>
+#include <QRegularExpressionValidator>
 
 extern quint8 nADC;
 const quint32 nFramesDefault = 1024;

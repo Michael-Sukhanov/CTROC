@@ -64,9 +64,9 @@ MainWindow::MainWindow(QWidget *parent)
     //обработка поведения lineEditов
     //ui->lineEdit->setValidator (new QRegExpValidator(QRegExp("^([1-9][0-9]{0,2}|1000)$")));
     ui->lineEdit->setValidator(new QIntValidator(0,99999));
-    if(ADCRangeLE  ) {ADCRangeLE->setValidator (new QRegExpValidator(QRegExp(QString("^[0-7]{1,%1}$").arg(nADC))));}
-    if(setRateLE   ) setRateLE->   setValidator(new QRegExpValidator(QRegExp("[0-9]+")));
-    if(readStreamLE) readStreamLE->setValidator(new QRegExpValidator(QRegExp("[0-9]+")));
+    if(ADCRangeLE  ) {ADCRangeLE->setValidator (new QRegularExpressionValidator(QRegularExpression("^[0-7]{1,%1}$")));}
+    if(setRateLE   ) setRateLE->   setValidator(new QRegularExpressionValidator(QRegularExpression("[0-9]+")));
+    if(readStreamLE) readStreamLE->setValidator(new QRegularExpressionValidator(QRegularExpression("[0-9]+")));
 
     QList<QLineEdit*> lineEditsList = this->findChildren<QLineEdit*>(QRegularExpression("lineEdit_com_*"));
     for(auto &el : lineEditsList){
@@ -259,8 +259,8 @@ void MainWindow::getScanData(ScanData *resp){
     getRawFrames(lastScanData, frames);
     correctFrames(frames.begin(), frames.end());
 
-    meanFrame  = Frame(frames.begin(), frames.end(), FrameMEAN , nullptr, lastScanData->getSizeX(), lastScanData->getSizeZ());
-    stdevFrame = Frame(frames.begin(), frames.end(), FrameSTDEV, &meanFrame, lastScanData->getSizeX(), lastScanData->getSizeZ());
+    meanFrame  = Frame(frames.begin(), frames.end(), FrameMEAN , lastScanData->getSizeX(), lastScanData->getSizeZ());
+    stdevFrame = Frame(frames.begin(), frames.end(), FrameSTDEV, lastScanData->getSizeX(), lastScanData->getSizeZ());
 
 
     singleFrameMap->update(frames.first(), rMode ? getValueRange(frames) : getValueRange(frames[currentframeIndex]));
@@ -342,7 +342,7 @@ quint16 MainWindow::getUIcommandMask(){
     quint16 mask = 0;
     for(const auto &el : cbList){
         quint32 bit;
-        sscanf_s(el->objectName().toStdString().c_str(), "checkBox_%u", &bit);
+        sscanf(el->objectName().toStdString().c_str(), "checkBox_%u", &bit);
         if(el->isChecked()) mask |= (1 << bit);
     }
     return mask;
@@ -383,7 +383,7 @@ void MainWindow::saveSettings(){
 Frame MainWindow::getDarkFrame(ScanData *sd){
     QVector<Frame> frames;
     getRawFrames(sd, frames);
-    return Frame(frames.begin(),frames.end());
+    return Frame(frames.begin(),frames.end(), FrameDARK);
 }
 
 Frame MainWindow::getLighFrame(ScanData *sd){
